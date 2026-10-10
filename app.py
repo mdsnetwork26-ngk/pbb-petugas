@@ -94,6 +94,8 @@ STATUS_LABEL = {
 
 @bp.route("/")
 def dashboard():
+    if g.user["role"] == "petugas":          # petugas langsung ke daftar ketetapannya
+        return redirect(url_for("app.data_pajak"))
     conn = connect()
     try:
         tahun = tahun_aktual()
@@ -1183,9 +1185,11 @@ def monitor():
     conn = connect()
     try:
         tahun = tahun_aktual()
+        S.perbarui_denda(conn)
         rows = S.laporan_blok(conn, tahun)
         tot = {k: sum(r[k] for r in rows) for k in ("target_sppt", "lunas_sppt", "proses_sppt",
-                                                     "belum_sppt", "target_nilai", "lunas_nilai")}
+                                                     "belum_sppt", "target_nilai", "lunas_nilai",
+                                                     "kekurangan_nilai")}
         tot["persen_sppt"] = F.persen(tot["lunas_sppt"], tot["target_sppt"])
         return render_template("monitor.html", tahun=tahun, rows=rows, tot=tot,
                                port=request.host.split(":")[-1] if ":" in request.host else "8088")

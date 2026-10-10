@@ -111,7 +111,8 @@ def login():
             session.clear()
             session["uid"] = row["id"]
             session.permanent = True
-            nxt = session.get("after_login") or url_for("app.dashboard")
+            nxt = session.get("after_login") or (
+                url_for("app.data_pajak") if row["role"] == "petugas" else url_for("app.dashboard"))
             session.pop("after_login", None)
             return redirect(nxt)
         error = "User atau password salah."

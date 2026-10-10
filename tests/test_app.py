@@ -639,7 +639,8 @@ def test_petugas_hanya_blok_sendiri(klien, app):
     masuk(klien, "coba-uji", "rahasia1")
     for halaman in ("/laporan", "/impor", "/pengaturan", "/petugas", "/realisasi"):
         assert klien.get(halaman).status_code == 403, halaman
-    assert klien.get("/").status_code == 200
+    r = klien.get("/")
+    assert r.status_code == 302 and "/data" in r.headers["Location"]   # petugas -> daftar ketetapan
     if punya:                                                # NOP milik petugas lain -> ditolak
         assert klien.get(f"/bayar/{punya['id']}").status_code == 403
     html = klien.get("/data?tahun=2026").get_data(as_text=True)
@@ -863,7 +864,7 @@ def test_login_petugas_dari_buat_sampai_nonaktif(klien, app):
 
     # login benar: masuk, hanya blok sendiri, menu admin terkunci
     masuk(klien, "coba-satu", "rahasia77")
-    assert klien.get("/").status_code == 200
+    assert klien.get("/").status_code == 302                # petugas -> daftar ketetapan
     for halaman in ("/pengaturan", "/laporan", "/impor", "/petugas"):
         assert klien.get(halaman).status_code == 403, halaman
     html = klien.get("/data?tahun=2026").get_data(as_text=True)
@@ -965,3 +966,35 @@ def test_buat_akun_login_lewat_ubah_petugas(klien, app):
     c = conn()
     assert c.execute("SELECT COUNT(*) c FROM users WHERE username='darsono'").fetchone()["c"] == 1
     c.close()
+
+
+def test_menu_petugas_dan_papan_progres_rp(klien, app):
+    """Menu petugas tinggal 3, landing di /data, kartu HP tersedia, papan progres ada nilai Rp."""
+    masuk(klien)
+    impor(klien, KOLOM_KETETAPAN, empat_rows(), "k.xlsx")          # Blok 1: 4 NOP
+
+    # papan progres: nilai ketetapan & belum terbayar per petugas + total
+    html = klien.get("/monitor?tahun=2026").get_data(as_text=True)
+    assert "Nilai ketetapan" in html and "Belum terbayar" in html
+    c = conn()
+    tot_target = c.execute("SELECT COALESCE(SUM(pokok+denda),0) v FROM tagihan WHERE tahun_pajak='2026'").fetchone()["v"]
+    c.close()
+    import re as _re
+    m = _re.search(r"Belum terbayar</div><div class=\"val\"[^>]*>([^<]+)", html)
+    assert m and _re.sub(r"[^0-9]", "", m.group(1)) == str(tot_target)  # belum ada bayar -> kekurangan == target
+
+    post(klien, "/petugas/simpan", nama="Darsono", blok="Blok 1", aktif="1",
+         buat_user="1", password="rahasia5")
+    masuk(klien, "darsono", "rahasia5")
+
+    # landing petugas = daftar ketetapan; mode senior aktif; kartu HP tersedia
+    r = klien.get("/", follow_redirects=True)
+    html = r.get_data(as_text=True)
+    assert "mode-petugas" in html and 'class="kartu' in html
+    # menu: hanya ketetapan, pindah blok, papan progres
+    for menu in ("Ketetapan", "Pindah Blok", "Papan Progres"):
+        assert menu in html, menu
+    for menu in ("Transaksi", "Antrean Billing", "Cetak Ulang", "Beranda", "Laporan"):
+        assert menu not in html, menu
+    # papan progres tetap bisa dibuka petugas
+    assert "Belum terbayar" in klien.get("/monitor?tahun=2026").get_data(as_text=True)

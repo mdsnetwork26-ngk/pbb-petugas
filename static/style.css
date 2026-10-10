@@ -132,3 +132,35 @@ ol.bantuan li,ul.bantuan li{margin:.25rem 0}
   td,th{padding:.4rem .45rem}
   .kolom-hapus{display:none}
 }
+
+/* ========= mode petugas: ramah HP & pengguna senior (50+) ========= */
+body.mode-petugas{font-size:16.5px}
+.mode-petugas .topbar nav a{padding:.55rem .7rem;font-size:1rem}
+.mode-petugas .btn,.mode-petugas .btn2{min-height:46px}
+.mode-petugas .btn.kecil,.mode-petugas .btn2.kecil{min-height:36px}
+.mode-petugas input,.mode-petugas select,.mode-petugas textarea{font-size:1.05rem}
+.mode-petugas input[name="jumlah"]{font-size:1.5rem;font-weight:800;text-align:right}
+.mode-petugas table{font-size:1.02rem}
+.mode-petugas .badge{font-size:.95rem;padding:.28rem .6rem}
+.mode-petugas .help{font-size:.92rem}
+.mode-petugas .papan table{font-size:1rem}
+.mode-petugas .papan .blok-card .nm{font-size:1.35rem}
+
+/* kartu NOP (pengganti tabel di layar HP) */
+.kartu-daftar{display:none}
+.kartu{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.85rem .95rem;box-shadow:var(--shadow)}
+.kartu + .kartu{margin-top:.7rem}
+.kartu-atas{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start}
+.kartu-nm{font-size:1.25rem;font-weight:800;line-height:1.25}
+.kartu-rp{display:flex;gap:1.2rem;flex-wrap:wrap;margin:.6rem 0;padding:.55rem .7rem;background:var(--bg);border-radius:10px}
+.kartu-rp b{font-size:1.2rem}
+.kartu-rp .help{display:block}
+.kartu-aksi{display:flex;gap:.5rem}
+.kartu-aksi .btn,.kartu-aksi .btn2{flex:1;justify-content:center;font-size:1.05rem;font-weight:700}
+@media(max-width:720px){
+  .kartu-daftar{display:block}
+  .tabel-nop{display:none}
+  .topbar nav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .topbar nav a{white-space:nowrap}
+  .wrap{padding:.65rem}
+}

@@ -34,13 +34,16 @@
       <div class="sub">{{ tot.persen_sppt }}% capaian</div></div>
     <div class="stat"><div class="lbl">Dalam proses</div><div class="val" style="color:#f2c14e">{{ tot.proses_sppt|angka }}</div></div>
     <div class="stat"><div class="lbl">Nilai terealisasi</div><div class="val">{{ tot.lunas_nilai|rp }}</div>
-      <div class="sub">dari target {{ tot.target_nilai|rp }}</div></div>
+      <div class="sub">dari nilai ketetapan {{ tot.target_nilai|rp }}</div></div>
+    <div class="stat"><div class="lbl">Belum terbayar</div><div class="val" style="color:#f2c14e">{{ tot.kekurangan_nilai|rp }}</div>
+      <div class="sub">target &minus; terealisasi (seluruh blok)</div></div>
   </div>
   <div class="tabel-scroll" style="max-height:56vh">
     <table>
       <thead><tr><th>Blok</th><th>Petugas</th><th class="num">SPPT</th><th class="num">Lunas</th>
         <th class="num">Proses</th><th class="num">Belum</th><th style="width:20%">Capaian SPPT</th>
-        <th class="num">Terealisasi</th><th class="num">Setoran petugas</th><th class="num">Bayar mandiri</th></tr></thead>
+        <th class="num">Nilai ketetapan</th><th class="num">Terealisasi</th><th class="num">Belum terbayar</th>
+        <th class="num">Setoran petugas</th><th class="num">Bayar mandiri</th></tr></thead>
       <tbody>
       {% for r in rows %}
         <tr><td><b>{{ r.blok }}</b></td><td>{{ r.nama }}</td>
@@ -48,11 +51,13 @@
           <td class="num">{{ r.proses_sppt }}</td><td class="num">{{ r.belum_sppt }}</td>
           <td><div class="bar"><span style="width:{{ r.persen_sppt }}%"></span></div>
             <div style="color:#9fc2da;font-size:.75rem">{{ r.persen_sppt }}% · {{ r.persen_rp }}% nilai</div></td>
+          <td class="num">{{ r.target_nilai|rp }}</td>
           <td class="num">{{ r.lunas_nilai|rp }}</td>
+          <td class="num" style="color:#f2c14e;font-weight:700">{{ r.kekurangan_nilai|rp }}</td>
           <td class="num">{{ r.via_petugas_rp|rp }}</td>
           <td class="num">{{ r.bayar_sendiri_rp|rp }}</td></tr>
       {% else %}
-        <tr><td colspan="10" style="text-align:center;color:#9fc2da;padding:1.4rem">Belum ada data ketetapan.</td></tr>
+        <tr><td colspan="12" style="text-align:center;color:#9fc2da;padding:1.4rem">Belum ada data ketetapan.</td></tr>
       {% endfor %}
       </tbody>
     </table>

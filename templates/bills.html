@@ -75,7 +75,7 @@
       <a class="btn2 kecil" href="{{ url_for('app.impor') }}">Impor / perbarui ketetapan</a>
     </div>
   </div>
-  <div class="tabel-scroll">
+  <div class="tabel-scroll tabel-nop">
     <table>
       <thead><tr>
         <th>NOP</th><th>Nama Wajib Pajak</th><th class="kolom-hapus">Alamat Objek</th>
@@ -115,6 +115,41 @@
       {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  {# tampilan kartu untuk layar HP (tabel di atas disembunyikan otomatis di layar sempit) #}
+  <div class="kartu-daftar" style="padding:.7rem">
+    {% for t in rows %}
+    <div class="kartu">
+      <div class="kartu-atas">
+        <div>
+          <div class="kartu-nm">{{ t.nama_wp }}</div>
+          <div class="help nop">{{ t.nop }}</div>
+          {% if is_admin and t.petugas_blok %}<div class="help">Blok {{ t.petugas_blok }} · {{ t.petugas_nama }}</div>{% endif %}
+        </div>
+        {% if t.status == 'lunas' %}<span class="badge ok">Lunas</span>
+        {% elif t.status == 'proses' %}<span class="badge warn">Diproses</span>
+        {% else %}<span class="badge muted">Belum bayar</span>{% endif %}
+      </div>
+      <div class="kartu-rp">
+        <div><span class="help">Tagihan</span><b>{{ (t.pokok + t.denda)|rp }}</b></div>
+        {% if t.denda %}<div><span class="help">denda</span><b style="color:var(--bad)">{{ t.denda|rp }}</b></div>{% endif %}
+        {% if t.dibayar %}<div><span class="help">diterima</span><b style="color:var(--ok)">{{ t.dibayar|rp }}</b></div>{% endif %}
+        {% if t.tgl_bayar %}<div><span class="help">tgl bayar</span><b>{{ t.tgl_bayar|tgl }}</b></div>{% endif %}
+      </div>
+      <div class="kartu-aksi">
+        {% if t.pembayaran_id %}
+          <a class="btn2" href="{{ url_for('app.kwitansi', pid=t.pembayaran_id) }}">Kwitansi</a>
+        {% else %}
+          <a class="btn" href="{{ url_for('app.bayar', tag_id=t.id) }}">REKAM BAYAR</a>
+        {% endif %}
+        <a class="btn2" href="{{ url_for('app.pindah_page', tag=t.id) }}">&#8646; Pindah</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="kosong">Tidak ada NOP yang cocok. Coba reset filter, atau
+      <a href="{{ url_for('app.impor') }}">impor file ketetapan</a> dulu.</div>
+    {% endfor %}
   </div>
 </div>
 {% if pages > 1 %}
