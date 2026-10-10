@@ -1,0 +1,11 @@
+services:
+  pbb-petugas:
+    build: .
+    container_name: pbb-petugas
+    restart: unless-stopped
+    ports:
+      - "8088:8088"          # kiri = port di server (ubah bila bentrok), kanan = port dalam kontainer
+    volumes:
+      - ./data:/app/data     # database & cadangan tersimpan di host, aman saat kontainer dibangun ulang
+    environment:
+      - TZ=Asia/Jakarta
