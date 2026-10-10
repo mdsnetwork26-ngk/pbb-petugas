@@ -803,7 +803,9 @@ def petugas_page():
             "SELECT id, username, nama, role, petugas_id, aktif FROM users ORDER BY role, username")]
         eid = int(arg("edit", "0") or 0)
         edit = conn.execute("SELECT * FROM petugas WHERE id=?", (eid,)).fetchone() if eid else None
-        return render_template("petugas.html", rows=rows, users=users, edit=dict(edit) if edit else None)
+        punya_user = {u["petugas_id"] for u in users if u["petugas_id"]}
+        return render_template("petugas.html", rows=rows, users=users, edit=dict(edit) if edit else None,
+                               punya_user=punya_user)
     finally:
         conn.close()
 
@@ -826,12 +828,16 @@ def petugas_simpan():
             if f.get("buat_user") and pid:
                 uname = F.slug(f.get("nama"))[:20]
                 pw = f.get("password") or "pbb123"
-                from werkzeug.security import generate_password_hash
-                conn.execute("INSERT OR IGNORE INTO users(username,password_hash,nama,role,petugas_id,created_at) "
-                             "VALUES(?,?,?,?,?,?)",
-                             (uname, generate_password_hash(pw), f.get("nama"), "petugas", pid,
-                              dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                flash(f"Petugas disimpan. Akses login petugas: user '{uname}' password '{pw}'.", "ok")
+                if conn.execute("SELECT id FROM users WHERE username=?", (uname,)).fetchone():
+                    flash(f"Petugas disimpan. User '{uname}' sudah ada — akun tidak dibuat ulang "
+                          "(reset passwordnya di tabel Akun login bila perlu).", "ok")
+                else:
+                    from werkzeug.security import generate_password_hash
+                    conn.execute("INSERT INTO users(username,password_hash,nama,role,petugas_id,created_at) "
+                                 "VALUES(?,?,?,?,?,?)",
+                                 (uname, generate_password_hash(pw), f.get("nama"), "petugas", pid,
+                                  dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    flash(f"Petugas disimpan. Akses login petugas: user '{uname}' password '{pw}'.", "ok")
             else:
                 flash("Data petugas disimpan.", "ok")
             conn.commit()

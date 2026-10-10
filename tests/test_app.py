@@ -930,3 +930,38 @@ def test_hapus_petugas(klien, app):
     c.close()
     r = klien.post("/login", data={"_csrf": "", "username": "petugas-dua", "password": "rahasia1"})
     assert "User atau password salah" in r.get_data(as_text=True)
+
+
+def test_buat_akun_login_lewat_ubah_petugas(klien, app):
+    """Petugas placeholder hasil impor (tanpa akun) bisa diberi akun lewat form UBAH."""
+    masuk(klien)
+    impor(klien, KOLOM_KETETAPAN,
+          [[1, "35.18.0100000.0001.001-0", "2026", "WP 1", "Jl. 1", "Jl. 1", 100, 40, 30000, "darsono"]],
+          "k.xlsx")
+    c = conn()
+    p = c.execute("SELECT * FROM petugas").fetchone()
+    assert p["nama"] == "Petugas darsono" and p["blok"] == "darsono"   # placeholder otomatis
+    pid = p["id"]
+    c.close()
+
+    # form ubah tersedia dan menawarkan buat akun (belum punya)
+    html = klien.get(f"/petugas?edit={pid}").get_data(as_text=True)
+    assert "belum punya" in html and 'name="buat_user"' in html
+
+    # ubah jadi data benar + buat akun
+    r = post(klien, "/petugas/simpan", id=str(pid), nama="Darsono", blok="Blok 1",
+             aktif="1", buat_user="1", password="rahasia5")
+    assert "user 'darsono' password 'rahasia5'" in r.get_data(as_text=True)
+
+    # petugas bisa login dan melihat NOP-nya
+    masuk(klien, "darsono", "rahasia5")
+    assert "WP 1" in klien.get("/data?tahun=2026").get_data(as_text=True)
+
+    # ubah lagi: centang buat_user tidak menduplikat akun
+    masuk(klien)
+    r = post(klien, "/petugas/simpan", id=str(pid), nama="Darsono", blok="Blok 1",
+             aktif="1", buat_user="1", password="x")
+    assert "sudah ada — akun tidak dibuat ulang" in r.get_data(as_text=True)
+    c = conn()
+    assert c.execute("SELECT COUNT(*) c FROM users WHERE username='darsono'").fetchone()["c"] == 1
+    c.close()

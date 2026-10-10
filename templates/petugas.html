@@ -75,6 +75,13 @@
           <div><label class="lbl">User login</label><input name="username_auto" value="(dari nama)" readonly></div>
           <div><label class="lbl">Password awal</label><input name="password" value="pbb123"></div>
         </div>
+        {% elif edit.id not in punya_user %}
+        <label class="check" style="margin-top:.4rem"><input type="checkbox" name="buat_user" value="1" checked>
+          buatkan akun login untuk petugas ini <b>(belum punya)</b></label>
+        <div class="row" style="margin-top:.4rem">
+          <div><label class="lbl">User login</label><input value="(dari nama)" readonly disabled></div>
+          <div><label class="lbl">Password awal</label><input name="password" value="pbb123"></div>
+        </div>
         {% endif %}
       </div>
       <div style="margin-top:.7rem;display:flex;gap:.5rem">
@@ -109,6 +116,9 @@
   </table>
   <div class="help" style="padding:.6rem 1rem">Bila user baru: centang “buatkan sekalian akun login” pada formulir
     tambah petugas. Password awal diumumkan langsung ke petugas yang bersangkutan dan wajib diganti
-    (menu <i>ganti password</i> di kanan atas).</div>
+    (menu <i>ganti password</i> di kanan atas).<br>
+    <b>Petugas yang muncul otomatis dari impor</b> (nama “Petugas X” — dibuat karena kolom petugas blok
+    di file Excel tidak dikenali) <b>belum punya akun login</b>: buka <i>ubah</i> pada petugas itu,
+    isi nama &amp; blok yang benar, lalu centang “buatkan akun login”.</div>
 </div>
 {% endblock %}
