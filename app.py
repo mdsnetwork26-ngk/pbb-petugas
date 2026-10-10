@@ -840,6 +840,51 @@ def petugas_simpan():
         conn.close()
 
 
+@bp.route("/petugas/hapus", methods=["POST"])
+@admin_perlu
+def petugas_hapus():
+    conn = connect()
+    try:
+        f = request.form
+        try:
+            pid = int(f.get("id", "0") or 0)
+        except ValueError:
+            pid = 0
+        pilih = (f.get("pindah_ke", "") or "").strip()
+        tujuan = None
+        if pilih and pilih != "lepas":
+            try:
+                tujuan = int(pilih)
+            except ValueError:
+                flash("Pilihan petugas pengganti tidak sah.", "danger")
+                return redirect(url_for("app.petugas_page"))
+        elif not pilih:
+            n = conn.execute("SELECT COUNT(*) c FROM tagihan WHERE petugas_id=?",
+                             (pid,)).fetchone()["c"]
+            if n:
+                flash(f"Petugas masih memegang {n} NOP — pilih petugas pengganti "
+                      "(atau 'lepas') pada kolom pilihan di sebelah tombol hapus, lalu hapus lagi.",
+                      "danger")
+                return redirect(url_for("app.petugas_page"))
+        try:
+            info = S.hapus_petugas(conn, pid, tujuan)
+            conn.commit()
+            msg = f"Petugas {info['nama']} (Blok {info['blok']}) dihapus."
+            if info["n_nop"]:
+                msg += (f" {info['n_nop']} NOP dipindah ke {info['tujuan']}." if info["tujuan"]
+                        else f" {info['n_nop']} NOP dilepas (tanpa petugas).")
+            if info["n_usulan_ditolak"]:
+                msg += f" {info['n_usulan_ditolak']} usulan pindah menunggu ditolak otomatis."
+            if info["users"]:
+                msg += f" Akun login dinonaktifkan: {', '.join(info['users'])}."
+            flash(msg, "ok")
+        except ValueError as e:
+            flash(str(e), "danger")
+        return redirect(url_for("app.petugas_page"))
+    finally:
+        conn.close()
+
+
 @bp.route("/petugas/user/reset", methods=["POST"])
 @admin_perlu
 def user_reset():

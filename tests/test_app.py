@@ -847,3 +847,86 @@ def test_laporan_dan_xlsx_memuat_kekurangan(klien, app):
     assert "90.000" in html or "90,000" in html or "Rp" in html   # 4 x tagihan masih jadi kekurangan
     r = klien.get("/laporan/progres.xlsx")
     assert r.status_code == 200 and len(r.data) > 5000
+
+
+def test_login_petugas_dari_buat_sampai_nonaktif(klien, app):
+    """Siklus akun petugas pemungut: dibuat admin -> login -> ganti pw -> nonaktif."""
+    masuk(klien)
+    impor(klien, KOLOM_KETETAPAN, empat_rows(), "k.xlsx")          # 4 NOP di Blok 1
+    r = post(klien, "/petugas/simpan", nama="Coba Satu", blok="Blok 5", aktif="1",
+             buat_user="1", password="rahasia77")
+    assert "user 'coba-satu' password 'rahasia77'" in r.get_data(as_text=True)
+
+    # password salah ditolak
+    r = klien.post("/login", data={"_csrf": "", "username": "coba-satu", "password": "salah"})
+    assert "User atau password salah" in r.get_data(as_text=True)
+
+    # login benar: masuk, hanya blok sendiri, menu admin terkunci
+    masuk(klien, "coba-satu", "rahasia77")
+    assert klien.get("/").status_code == 200
+    for halaman in ("/pengaturan", "/laporan", "/impor", "/petugas"):
+        assert klien.get(halaman).status_code == 403, halaman
+    html = klien.get("/data?tahun=2026").get_data(as_text=True)
+    assert "Coba Satu" in html and "Wajib Pajak 1" not in html
+
+    # reset password oleh admin -> password lama mati, yang baru hidup
+    masuk(klien)
+    c = conn()
+    uid = c.execute("SELECT id FROM users WHERE username='coba-satu'").fetchone()["id"]
+    c.close()
+    post(klien, "/petugas/user/reset", id=str(uid), password="pwbaru99")
+    masuk(klien, "coba-satu", "pwbaru99")
+
+    # nonaktifkan -> tidak bisa login lagi
+    masuk(klien)
+    c = conn()
+    conn_exec = c.execute("UPDATE users SET aktif=0 WHERE id=?", (uid,))
+    c.commit()
+    c.close()
+    r = klien.post("/login", data={"_csrf": "", "username": "coba-satu", "password": "pwbaru99"})
+    assert "User atau password salah" in r.get_data(as_text=True)
+
+
+def test_hapus_petugas(klien, app):
+    masuk(klien)
+    impor(klien, KOLOM_KETETAPAN, empat_rows(), "k.xlsx")          # 4 NOP di Blok 1
+    post(klien, "/petugas/simpan", nama="Petugas Dua", blok="Blok 2", aktif="1",
+         buat_user="1", password="rahasia1")
+    c = conn()
+    p1 = c.execute("SELECT id FROM petugas WHERE blok='Blok 1'").fetchone()["id"]
+    p2 = c.execute("SELECT id FROM petugas WHERE blok='Blok 2'").fetchone()["id"]
+    t1 = c.execute("SELECT id FROM tagihan ORDER BY id LIMIT 1").fetchone()["id"]
+    c.close()
+    # usulan pindah ke Blok 2 sedang menunggu (uji auto-tolak saat Blok 2 dihapus)
+    post(klien, "/pindah/ajukan", tagihan_id=t1, petugas_baru=p2, alasan="uji")
+
+    # hapus tanpa pilihan pengganti padahal masih pegang NOP -> ditolak
+    r = post(klien, "/petugas/hapus", id=str(p1))
+    assert "masih memegang 4 NOP" in r.get_data(as_text=True)
+
+    # hapus Blok 1, NOP diserahkan ke Blok 2
+    r = post(klien, "/petugas/hapus", id=str(p1), pindah_ke=str(p2))
+    b = r.get_data(as_text=True)
+    assert "dihapus" in b and "4 NOP dipindah" in b and "Blok 2" in b
+    c = conn()
+    assert c.execute("SELECT COUNT(*) c FROM tagihan WHERE petugas_id=?", (p1,)).fetchone()["c"] == 0
+    assert c.execute("SELECT COUNT(*) c FROM tagihan WHERE petugas_id=?", (p2,)).fetchone()["c"] == 4
+    assert c.execute("SELECT COUNT(*) c FROM petugas WHERE id=?", (p1,)).fetchone()["c"] == 0
+    c.close()
+
+    # petugas Blok 2 masih bisa login (akunnya hidup)
+    masuk(klien, "petugas-dua", "rahasia1")
+    masuk(klien)
+
+    # hapus Blok 2 dengan 'lepas' -> NOP tanpa petugas, usulan ditolak otomatis, akun nonaktif
+    r = post(klien, "/petugas/hapus", id=str(p2), pindah_ke="lepas")
+    assert "dihapus" in r.get_data(as_text=True) and "dilepas" in r.get_data(as_text=True)
+    c = conn()
+    assert c.execute("SELECT COUNT(*) c FROM petugas WHERE id=?", (p2,)).fetchone()["c"] == 0
+    assert c.execute("SELECT COUNT(*) c FROM tagihan WHERE petugas_id IS NULL").fetchone()["c"] == 4
+    assert c.execute("SELECT status FROM usulan_pindah WHERE tagihan_id=?",
+                     (t1,)).fetchone()["status"] == "ditolak"
+    assert c.execute("SELECT aktif FROM users WHERE username='petugas-dua'").fetchone()["aktif"] == 0
+    c.close()
+    r = klien.post("/login", data={"_csrf": "", "username": "petugas-dua", "password": "rahasia1"})
+    assert "User atau password salah" in r.get_data(as_text=True)

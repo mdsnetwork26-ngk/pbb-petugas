@@ -21,7 +21,21 @@
           <td class="help">{{ p.wilayah }}{% if p.telepon %}<br>{{ p.telepon }}{% endif %}</td>
           <td class="num">{{ p.jumlah }}</td>
           <td class="num" style="color:var(--ok)">{{ p.lunas }}</td>
-          <td style="text-align:right"><a class="btn2 kecil" href="?edit={{ p.id }}">ubah</a></td>
+          <td style="text-align:right">
+            <a class="btn2 kecil" href="?edit={{ p.id }}">ubah</a>
+            <form method="post" action="{{ url_for('app.petugas_hapus') }}"
+                  style="display:inline-flex;gap:3px;margin-top:4px;align-items:center"
+                  onsubmit="return confirm('Hapus petugas {{ p.nama|e }} — {{ p.blok|e }}?\nNOP yang masih dipegang diserahkan sesuai pilihan di sebelah tombol ini. Akun login petugas ikut dinonaktifkan.')">
+              <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              <input type="hidden" name="id" value="{{ p.id }}">
+              <select name="pindah_ke" style="width:auto;font-size:.72rem;padding:2px 4px">
+                <option value="">NOP diserahkan ke&hellip;</option>
+                {% for q in rows if q.id != p.id %}<option value="{{ q.id }}">Blok {{ q.blok }}</option>{% endfor %}
+                <option value="lepas">&mdash; lepas (tanpa petugas) &mdash;</option>
+              </select>
+              <button class="btn2 kecil" style="color:var(--bad)">hapus</button>
+            </form>
+          </td>
         </tr>
       {% else %}
         <tr><td colspan="6" class="kosong">Belum ada petugas. Tambahkan 7 blok di formulir samping.</td></tr>

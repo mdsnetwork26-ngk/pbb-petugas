@@ -250,6 +250,39 @@ def putuskan_pindah(conn, usulan_id: int, setuju: bool, catatan: str = "") -> st
     return st
 
 
+def hapus_petugas(conn, petugas_id: int, pindah_ke: int | None = None) -> dict:
+    """Hapus petugas blok.
+
+    - NOP yang dipegang dipindahkan ke petugas pengganti (pindah_ke) atau dilepas (None).
+    - Usulan pindah yang sedang menunggu dan menunjuk blok ini ditolak otomatis.
+    - Akun login yang terikat petugas ini dinonaktifkan (riwayat kwitansi tidak diubah).
+    """
+    p = conn.execute("SELECT * FROM petugas WHERE id=?", (petugas_id,)).fetchone()
+    if not p:
+        raise ValueError("Petugas tidak ditemukan.")
+    tujuan = None
+    if pindah_ke is not None:
+        tujuan = conn.execute("SELECT * FROM petugas WHERE id=?", (pindah_ke,)).fetchone()
+        if not tujuan or tujuan["id"] == petugas_id:
+            raise ValueError("Petugas pengganti tidak valid.")
+    n_nop = conn.execute("SELECT COUNT(*) c FROM tagihan WHERE petugas_id=?",
+                         (petugas_id,)).fetchone()["c"]
+    if n_nop:
+        conn.execute("UPDATE tagihan SET petugas_id=?, updated_at=? WHERE petugas_id=?",
+                     (pindah_ke, now(), petugas_id))
+    n_usulan = conn.execute(
+        "UPDATE usulan_pindah SET status='ditolak', "
+        "catatan_admin=TRIM(catatan_admin || ' | Petugas blok tujuan dihapus'), diputuskan_pada=? "
+        "WHERE petugas_baru=? AND status='menunggu'", (now(), petugas_id)).rowcount
+    users = [r["username"] for r in conn.execute(
+        "SELECT username FROM users WHERE petugas_id=?", (petugas_id,))]
+    conn.execute("UPDATE users SET aktif=0 WHERE petugas_id=?", (petugas_id,))
+    conn.execute("DELETE FROM petugas WHERE id=?", (petugas_id,))
+    return {"nama": p["nama"], "blok": p["blok"], "n_nop": n_nop,
+            "tujuan": f"{tujuan['blok']} — {tujuan['nama']}" if tujuan else None,
+            "n_usulan_ditolak": n_usulan or 0, "users": users}
+
+
 # ------------------------------------------------------------ impor ketetapan
 
 def impor_ketetapan(conn, rows: list[dict], tahun_default: str, file_name: str,
