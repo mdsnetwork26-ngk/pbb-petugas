@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block judul %}Loket PBB{% endblock %} — Aplikasi Pembayaran PBB-P2</title>
+{# gaya disisipkan langsung supaya halaman tetap rapi walau berkas static tak terambil #}
+<style>{% include 'style.css' %}</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+{% block kerangka %}
+<header class="topbar tanpa-cetak">
+  <div class="merek">LOKET PBB-P2
+    <small>{{ s.wilayah_desa if s else '' }}</small>
+  </div>
+  {% if u %}
+  <nav>
+    <a href="{{ url_for('app.dashboard') }}" class="{{ 'aktif' if aktif=='beranda' }}">Beranda</a>
+    <a href="{{ url_for('app.data_pajak') }}" class="{{ 'aktif' if aktif=='data' }}">Data Ketetapan</a>
+    <a href="{{ url_for('app.pindah_page') }}" class="{{ 'aktif' if aktif=='pindah' }}">Pindah Blok</a>
+    <a href="{{ url_for('app.transaksi') }}" class="{{ 'aktif' if aktif=='transaksi' }}">Transaksi</a>
+    <a href="{{ url_for('app.billing') }}" class="{{ 'aktif' if aktif=='billing' }}">Antrean Billing</a>
+    <a href="{{ url_for('app.laporan_kwitansi') }}" class="{{ 'aktif' if aktif=='kwitansi' }}">Cetak Ulang</a>
+    <a href="{{ url_for('app.monitor') }}" class="{{ 'aktif' if aktif=='monitor' }}">Papan Progres</a>
+    {% if is_admin %}
+      <a href="{{ url_for('app.laporan') }}" class="{{ 'aktif' if aktif=='laporan' }}">Laporan</a>
+      <a href="{{ url_for('app.impor') }}" class="{{ 'aktif' if aktif=='impor' }}">Impor Data</a>
+      <a href="{{ url_for('app.petugas_page') }}" class="{{ 'aktif' if aktif=='petugas' }}">Petugas</a>
+      <a href="{{ url_for('app.pengaturan') }}" class="{{ 'aktif' if aktif=='pengaturan' }}">Pengaturan</a>
+    {% endif %}
+  </nav>
+  <div class="akun">
+    <b>{{ u.nama }}</b>
+    {{ 'Admin' if u.role=='admin' else (u.petugas.blok ~ ' — ' ~ u.petugas.nama if u.petugas else 'Petugas') }}
+    · <a href="{{ url_for('auth.ganti_password') }}" style="color:#d8f3ea">ganti password</a>
+    · <a href="{{ url_for('auth.logout') }}" style="color:#d8f3ea">keluar</a>
+  </div>
+  {% endif %}
+</header>
+<main class="wrap">
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for kat, isi in msgs %}
+      <div class="flash {{ kat }}">{{ isi|safe }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block isi %}{% endblock %}
+</main>
+{% block kaki %}{% endblock %}
+{% endblock %}
+</body>
+</html>

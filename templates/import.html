@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% set aktif = 'impor' %}
+{% block judul %}Impor Data{% endblock %}
+{% block isi %}
+<h1>Impor data</h1>
+<div class="help" style="margin-bottom:.8rem">Dua sumber data: <b>Ketetapan</b> (sumber kebenaran tagihan, Anda perbarui 2–3 kali setahun)
+  dan <b>Realisasi</b> (unduhan mingguan dari eSPPT, untuk menandai NOP mana yang sudah lunas).
+  Nama kolom tidak perlu persis — yang penting baris pertama berisi header.</div>
+
+<div class="grid g2" style="align-items:start">
+  <div class="card">
+    <h2>1 · Data ketetapan (SPPT)</h2>
+    <p class="help">Kolom yang dikenali: <code>NOP</code>, <code>TAHUN PAJAK</code>, <code>NAMA WAJIB PAJAK</code>,
+      <code>ALAMAT OBJEK PAJAK</code>, <code>ALAMAT WAJIB PAJAK</code>, <code>LUAS BUMI</code>,
+      <code>LUAS BANGUNAN</code>, <code>PBB YG DIBAYAR</code>, <code>NAMA PETUGAS BLOK</code>.</p>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="jenis" value="ketetapan">
+      <div class="row">
+        <div><label class="lbl">Tahun pajak default</label><input name="tahun" value="{{ tahun }}"></div>
+        <div><label class="lbl">File Excel / CSV</label>
+          <input type="file" name="file" accept=".xlsx,.xlsm,.xls,.csv" required></div>
+      </div>
+      <label class="check" style="margin-top:.4rem">
+        <input type="checkbox" name="aktifkan_semua" value="1">
+        Anggap file ini <b>ketetapan penuh</b>: NOP tahun ini yang tidak ada di file ditandai nonaktif (data pembayaran tidak dihapus)
+      </label>
+      <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn" type="submit">Proses ketetapan</button>
+        <a class="btn2" href="{{ url_for('app.unduh_format', jenis='ketetapan') }}">Unduh format .xlsx</a>
+      </div>
+    </form>
+    <ol class="bantuan" style="margin-top:.6rem">
+      <li>Transparan: pembayaran lama <b>tidak pernah</b> terhapus — pembaruan ketetapan hanya mengubah nama/alamat/nominal/petugas.</li>
+      <li>Bila nominal berubah setelah ada pembayaran, selisihnya muncul di laporan (status tetap tercatat).</li>
+      <li>Nilai <b>NOP</b> rusak/tidak 18 digit akan dilewati dan dilaporkan.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>2 · Data realisasi eSPPT</h2>
+    <p class="help">Kolom yang dikenali: <code>NOP</code>, <code>NAMA WP</code>, <code>ALAMAT WP</code>,
+      <code>TAHUN PAJAK</code>, <code>POKOK</code>, <code>DENDA</code>, <code>JUMLAH PEMBAYARAN</code>,
+      <code>TANGGAL PEMBAYARAN</code>. Sama persis dengan tabel “Realisasi Pajak Detail” di
+      <code>/realisasi_rekap_lurah</code>.</p>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="jenis" value="realisasi">
+      <div class="row">
+        <div><label class="lbl">File unduhan eSPPT</label>
+          <input type="file" name="file" accept=".xlsx,.xlsm,.xls,.csv" required></div>
+      </div>
+      <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn" type="submit">Proses realisasi &amp; cocokkan</button>
+        <a class="btn2" href="{{ url_for('app.unduh_format', jenis='realisasi') }}">Unduh format .xlsx</a>
+      </div>
+    </form>
+    <ol class="bantuan" style="margin-top:.6rem">
+      <li>NOP yang kwitansinya cocok → otomatis jadi <b>LUNAS terverifikasi</b>.</li>
+      <li>NOP lunas di eSPPT tapi <b>belum</b> ada kwitansi (WP bayar sendiri ke bank) → dibuatkan transaksi
+        otomatis, tercatat sebagai “bayar mandiri”, <b>tanpa</b> kwitansi petugas.</li>
+      <li>Jumlah berbeda lebih dari Rp1.000 → dihitung “selisih”, dicek di menu Laporan.</li>
+    </ol>
+  </div>
+</div>
+
+{% if hasil %}
+<div class="card" style="margin-top:.9rem">
+  <h2 style="margin-bottom:.4rem">Hasil impor {% if hasil.error %}<span class="badge bad">gagal</span>{% else %}<span class="badge ok">sukses</span>{% endif %}</h2>
+  {% if hasil.error %}
+    <div class="note bad">{{ hasil.error }}</div>
+  {% else %}
+    <p class="help">file: <b>{{ hasil.file }}</b> · dibaca dari sheet <b>{{ hasil.sheet }}</b></p>
+    {% if hasil.pesan %}<div class="note warn" style="margin-bottom:.5rem">{{ hasil.pesan }}</div>{% endif %}
+    <div class="grid g4">
+      {% for k, label in [('baru','Baris baru dibuat'),('ubah','Ada perubahan data'),('sama','Sama seperti sebelumnya'),
+                          ('tanpa_nominal','Tanpa nominal PBB'),('nop_salah','NOP tidak valid'),
+                          ('nonaktif','NOP tidak ada di file → nonaktif'),('verifikasi','Kwitansi ditandai LUNAS'),
+                          ('bayar_sendiri','Bayar mandiri ditemukan'),('beda','Selisih nominal'),
+                          ('tidak_ada_di_ketetapan','NOP tak ada di ketetapan'),('baris','Baris realisasi')] %}
+        {% if hasil.get(k) is not none and hasil[k] != 0 %}
+        <div class="stat"><div class="lbl">{{ label }}</div><div class="val">{{ hasil[k]|angka }}</div></div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% if hasil.ubah_detail %}
+    <details style="margin-top:.6rem"><summary class="help">lihat rincian perubahan ({{ hasil.ubah_detail|length }})</summary>
+      <table><thead><tr><th>NOP</th><th>Tahun</th><th>Lama</th><th>Baru</th></tr></thead><tbody>
+      {% for u in hasil.ubah_detail %}
+        <tr><td class="nop">{{ u.nop }}</td><td>{{ u.tahun }}</td><td>{{ u.lama }}</td><td>{{ u.baru }}</td></tr>
+      {% endfor %}</tbody></table></details>
+    {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card pad0" style="margin-top:.9rem">
+  <div class="head"><h2>Riwayat impor</h2></div>
+  <table>
+    <thead><tr><th>Waktu</th><th>Jenis</th><th>File</th><th>Tahun</th><th>Ringkasan</th><th>Oleh</th></tr></thead>
+    <tbody>
+    {% for b in batch %}
+      <tr><td style="white-space:nowrap">{{ b.created_at }}</td>
+        <td><span class="badge {{ 'info' if b.jenis=='ketetapan' else 'ok' }}">{{ b.jenis }}</span></td>
+        <td>{{ b.nama_file }}</td><td>{{ b.tahun_pajak }}</td>
+        <td class="help">{{ b.info }} · <code style="font-size:.68rem">{{ b.stat }}</code></td>
+        <td>{{ b.created_by }}</td></tr>
+    {% else %}
+      <tr><td colspan="6" class="kosong">Belum pernah impor file.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

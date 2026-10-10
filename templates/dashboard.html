@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% set aktif = 'beranda' %}
+{% block judul %}Beranda{% endblock %}
+{% block isi %}
+<div class="baru">
+  <div>
+    <h1>Beranda Loket PBB-P2</h1>
+    <div class="help">
+      {% if is_admin %}Seluruh blok{% else %}Blok {{ u.petugas.blok }} — {{ u.petugas.nama }}{% endif %}
+      · Tahun pajak:
+      <form method="get" class="inline" style="display:inline-flex">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <select name="tahun" onchange="this.form.submit()" style="width:auto;padding:.2rem .4rem">
+          {% for t in tahun_list %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+          <option value="{{ tahun }}">{{ tahun }}</option>
+        </select>
+      </form>
+    </div>
+  </div>
+  <div class="row" style="flex:0 1 auto">
+    <a class="btn2" href="{{ url_for('app.impor') }}">1 · Impor Ketetapan</a>
+    <a class="btn" href="{{ url_for('app.data_pajak') }}">2 · Cari NOP & Catat Bayar</a>
+    <a class="btn2" href="{{ url_for('app.billing') }}">3 · Antrean Billing eSPPT</a>
+    <a class="btn2" href="{{ url_for('app.laporan') }}">4 · Laporan per Blok</a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:.9rem">
+  <form class="row" method="get" action="{{ url_for('app.cari') }}" style="align-items:end">
+    <div style="flex:2">
+      <label class="lbl">Rekam pembayaran — ketik NOP atau nama wajib pajak</label>
+      <input name="nop" placeholder="35.18.010001.0001-0  atau  Slamet Wibowo" autofocus required
+             autocomplete="off" style="font-size:1.05rem;padding:.55rem .7rem">
+    </div>
+    <div style="flex:0 0 130px">
+      <label class="lbl">Tahun</label>
+      <select name="tahun" style="padding:.5rem">{% for t in tahun_list %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select>
+    </div>
+    <div style="flex:0 0 auto"><button class="btn" style="padding:.55rem 1.1rem;font-size:1rem">Cari &amp; catat</button></div>
+  </form>
+  <div class="help" style="margin-top:.4rem">Bila hanya satu NOP yang cocok, aplikasi langsung membuka
+    formulir pembayaran + cetak kwitansi. Tempel NOP hasil salinan dari HP/spanduk juga bisa.</div>
+</div>
+
+<div class="grid g4" style="margin-bottom:.9rem">
+  <div class="stat">
+    <div class="lbl">SPPT dalam ketetapan</div>
+    <div class="val">{{ ring.target_sppt|angka }}</div>
+    <div class="sub">target nilai {{ ring.target_nilai|rp }}</div>
+  </div>
+  <div class="stat">
+    <div class="lbl">Lunas terverifikasi</div>
+    <div class="val" style="color:var(--ok)">{{ ring.lunas_sppt|angka }} <span style="font-size:.8rem">/ {{ ring.target_sppt or 1 }} SPPT</span></div>
+    <div class="sub">{{ ring.lunas_nilai|rp }} · {{ ring.persen_rp }}% nilai</div>
+    <div class="bar"><span style="width:{{ ring.persen_sppt }}%"></span></div>
+  </div>
+  <div class="stat">
+    <div class="lbl">Uang diterima, belum lunas</div>
+    <div class="val" style="color:var(--warn)">{{ ring.proses_sppt|angka }}</div>
+    <div class="sub">{{ ring.di_tangan_rp|rp }} di tangan petugas ({{ ring.di_tangan }} kwitansi)</div>
+  </div>
+  <div class="stat">
+    <div class="lbl">Setoran hari ini</div>
+    <div class="val">{{ setor_hari.n|angka }} <span style="font-size:.8rem">transaksi</span></div>
+    <div class="sub">{{ setor_hari.rp|rp }} · bulan ini {{ bulan_rp|rp }}</div>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card pad0">
+    <div class="head"><h2>Progres per petugas blok</h2>
+      <span class="help">diperbarui otomatis setiap kali data masuk</span></div>
+    <div class="tabel-scroll">
+      <table>
+        <thead><tr><th>Blok</th><th>Petugas</th><th class="num">SPPT</th><th class="num">Lunas</th>
+          <th class="num">Proses</th><th style="width:26%">Capaian</th><th class="num">Tunai Petugas</th>
+          <th class="num">Bayar Mandiri</th></tr></thead>
+        <tbody>
+        {% for r in ring.rows %}
+          <tr>
+            <td><b>{{ r.blok }}</b></td>
+            <td>{{ r.nama }}</td>
+            <td class="num">{{ r.target_sppt }}</td>
+            <td class="num" style="color:var(--ok);font-weight:700">{{ r.lunas_sppt }}</td>
+            <td class="num">{{ r.proses_sppt }}</td>
+            <td>
+              <div class="bar"><span style="width:{{ r.persen_sppt }}%"></span></div>
+              <div class="help">{{ r.persen_sppt }}% · {{ r.lunas_nilai|rp }}</div>
+            </td>
+            <td class="num">{{ r.via_petugas_rp|rp }}</td>
+            <td class="num">{{ r.bayar_sendiri_rp|rp }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="kosong">Belum ada data ketetapan. Mulai dari
+            <a href="{{ url_for('app.impor') }}">Impor Data</a>.</td></tr>
+        {% endfor %}
+        </tbody>
+        {% if ring.rows %}<tfoot><tr><td colspan="2">TOTAL</td><td class="num">{{ ring.target_sppt }}</td>
+          <td class="num">{{ ring.lunas_sppt }}</td><td class="num">{{ ring.proses_sppt }}</td>
+          <td>{{ ring.persen_sppt }}%</td><td class="num">{{ ring.via_petugas_rp|rp }}</td>
+          <td class="num">{{ ring.bayar_sendiri_rp|rp }}</td></tr></tfoot>{% endif %}
+      </table>
+    </div>
+  </div>
+
+  <div class="grid" style="align-content:start">
+    <div class="card">
+      <h2 style="margin-bottom:.5rem">Langkah yang menunggu</h2>
+      <ul class="bantuan" style="list-style:none;margin:0;padding:0">
+        <li style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:.35rem 0">
+          <span><b>{{ antrean }}</b> NOP uang sudah diterima, billing eSPPT belum dibuat</span>
+          <a class="btn kecil" style="padding:.15rem .5rem" href="{{ url_for('app.billing') }}">Buka</a></li>
+        <li style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:.35rem 0">
+          <span><b>{{ ring.belum_sppt }}</b> NOP belum ada pembayaran sama sekali</span>
+          <a class="btn2 kecil" style="padding:.15rem .5rem" href="{{ url_for('app.data_pajak', status='belum', tahun=tahun) }}">Cek</a></li>
+        <li style="display:flex;justify-content:space-between;padding:.35rem 0">
+          <span>Laporan progres minggu ini (per blok, sudah termasuk yang bayar langsung ke bank)</span>
+          <a class="btn2 kecil" style="padding:.15rem .5rem" href="{{ url_for('app.laporan', tahun=tahun) }}">Lihat</a></li>
+      </ul>
+      {% if not is_admin %}<div class="note" style="margin-top:.6rem">
+        Anda masuk sebagai petugas. Tombol <b>Rekam Pembayaran</b> di Data Ketetapan adalah aktivitas utama Anda;
+        kwitansi langsung tercetak di halaman berikutnya.</div>{% endif %}
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:.4rem">Status sinkronisasi eSPPT</h2>
+      {% if s.esppt_enabled == '1' %}
+        <div class="note">Otomatisasi <b>AKTIF</b>
+          {% if s.esppt_billing_dry_run == '1' %}· mode simulasi/dry-run{% endif %}
+          {% if s.esppt_realisasi_path %}· realisasi: {{ s.esppt_realisasi_path }}{% endif %}</div>
+      {% else %}
+        <div class="note warn">Otomatisasi <b>MATI</b> — aplikasi hanya memakai file Excel unduhan.
+          Aktifkan di <a href="{{ url_for('app.pengaturan', tab='esppt') }}">Pengaturan › eSPPT</a>.</div>
+      {% endif %}
+      <div id="box-sinkron" class="help" style="margin-top:.5rem">
+        {% if sinkron.berjalan %}
+          <span class="badge info">sedang berjalan</span> {{ sinkron.sudah }} dari {{ sinkron.total }} langkah
+        {% elif sinkron.selesai %}
+          <span class="badge ok">sinkron terakhir: {{ sinkron.selesai }}</span>
+        {% else %}
+          <span class="badge muted">belum pernah dijalankan</span>
+        {% endif %}
+      </div>
+      {% if sinkron_log %}
+      <details style="margin-top:.4rem">
+        <summary class="help">log terakhir</summary>
+        <pre style="max-height:180px;overflow:auto;background:#0d1117;color:#c9d1d9;padding:.5rem;border-radius:8px;font-size:.7rem">
+{%- for l in sinkron_log %}
+{{ l.t }} [{{ l.level }}] {{ l.msg }}
+{%- endfor %}
+        </pre>
+      </details>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:.4rem">Transaksi terakhir</h2>
+      <table>
+        <tbody>
+        {% for b in recent %}
+          <tr><td style="width:34%">{{ b.tgl_bayar|tgl }} · {{ b.nomor_kwitansi or b.metode }}</td>
+            <td class="nop">{{ b.nop }}</td>
+            <td>{{ b.nama_wp }}</td>
+            <td class="num">{{ b.jumlah_diterima|rp }}</td>
+            <td style="width:1%"><a class="btn2 kecil" href="{{ url_for('app.kwitansi', pid=b.id) }}">kwitansi</a></td></tr>
+        {% else %}
+          <tr><td class="kosong">Belum ada transaksi tercatat.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

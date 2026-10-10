@@ -1,0 +1,29 @@
+# Service systemd untuk Aplikasi Loket Pembayaran PBB-P2.
+# Normally dipasang oleh deploy/ubuntu-setup.sh. Untuk memasang manual:
+#   sudo cp deploy/pbb-petugas.service /etc/systemd/system/pbb-petugas.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now pbb-petugas
+[Unit]
+Description=Aplikasi Loket Pembayaran PBB-P2 (petugas pemungut 7 blok)
+Documentation=file:///opt/pbb-petugas/doc/PANDUAN.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pbb
+Group=pbb
+WorkingDirectory=/opt/pbb-petugas
+Environment=PBB_PORT=8088
+ExecStart=/opt/pbb-petugas/.venv/bin/python /opt/pbb-petugas/app.py
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+
+# keamanan dasar: hanya folder data milik aplikasi yang boleh ditulis
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ReadWritePaths=/opt/pbb-petugas/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set aktif = 'petugas' %}
+{% block judul %}Petugas &amp; Blok{% endblock %}
+{% block isi %}
+<h1>Petugas pemungut per blok</h1>
+<div class="help" style="margin-bottom:.8rem">Nama <b>Blok</b> di sini harus sama dengan isi kolom
+  “NAMA PETUGAS BLOK” pada file ketetapan — supaya tiap NOP otomatis jatuh ke petugas yang benar.
+  Aplikasi mengenali juga penulisan “Blok 1”, “1”, atau nama orangnya.</div>
+
+<div class="grid g2" style="align-items:start">
+  <div class="card pad0">
+    <div class="head"><h2>{{ rows|length }} blok terdaftar</h2></div>
+    <table>
+      <thead><tr><th>Blok</th><th>Nama petugas</th><th>Kontak</th><th class="num">SPPT aktif</th>
+        <th class="num">Lunas</th><th></th></tr></thead>
+      <tbody>
+      {% for p in rows %}
+        <tr>
+          <td><b>{{ p.blok }}</b></td>
+          <td>{{ p.nama }}<br><span class="help">{{ p.jabatan }}{% if p.nip %} · NIP {{ p.nip }}{% endif %}</span></td>
+          <td class="help">{{ p.wilayah }}{% if p.telepon %}<br>{{ p.telepon }}{% endif %}</td>
+          <td class="num">{{ p.jumlah }}</td>
+          <td class="num" style="color:var(--ok)">{{ p.lunas }}</td>
+          <td style="text-align:right"><a class="btn2 kecil" href="?edit={{ p.id }}">ubah</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="kosong">Belum ada petugas. Tambahkan 7 blok di formulir samping.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>{{ 'Ubah petugas' if edit else 'Tambah petugas / blok' }}</h2>
+    <form method="post" action="{{ url_for('app.petugas_simpan') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      {% if edit %}<input type="hidden" name="id" value="{{ edit.id }}">{% endif %}
+      <div class="row">
+        <div><label class="lbl">Nama petugas</label>
+          <input name="nama" value="{{ edit.nama if edit else '' }}" required></div>
+        <div><label class="lbl">Blok / wilayah tugas</label>
+          <input name="blok" value="{{ edit.blok if edit else '' }}" placeholder="Blok 1" required></div>
+      </div>
+      <div class="row" style="margin-top:.5rem">
+        <div><label class="lbl">Cakupan blok</label>
+          <input name="wilayah" value="{{ edit.wilayah if edit else '' }}" placeholder="RW 01–03, Jl. Merdeka s/d Kenanga"></div>
+        <div class="sempit"><label class="lbl">Telepon / WA</label>
+          <input name="telepon" value="{{ edit.telepon if edit else '' }}"></div>
+      </div>
+      <div class="row" style="margin-top:.5rem">
+        <div><label class="lbl">NIP</label><input name="nip" value="{{ edit.nip if edit else '' }}"></div>
+        <div><label class="lbl">Jabatan di kwitansi</label>
+          <input name="jabatan" value="{{ edit.jabatan if edit else 'Petugas Pemungut PBB-P2' }}"></div>
+      </div>
+      <div style="margin-top:.6rem">
+        <label class="check"><input type="checkbox" name="aktif" value="1" {{ 'checked' if (edit and edit.aktif) or not edit }}> aktif</label>
+        {% if not edit %}
+        <label class="check"><input type="checkbox" name="buat_user" value="1" checked>
+          buatkan sekalian akun login petugas ini</label>
+        <div class="row" style="margin-top:.4rem">
+          <div><label class="lbl">User login</label><input name="username_auto" value="(dari nama)" readonly></div>
+          <div><label class="lbl">Password awal</label><input name="password" value="pbb123"></div>
+        </div>
+        {% endif %}
+      </div>
+      <div style="margin-top:.7rem;display:flex;gap:.5rem">
+        <button class="btn" type="submit">{{ 'Simpan perubahan' if edit else 'Simpan petugas' }}</button>
+        {% if edit %}<a class="btn2" href="{{ url_for('app.petugas_page') }}">batal</a>{% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card pad0" style="margin-top:.9rem">
+  <div class="head"><h2>Akun login</h2><span class="help">petugas cukup lihat bloknya sendiri + cetak kwitansi</span></div>
+  <table>
+    <thead><tr><th>User</th><th>Nama</th><th>Peran</th><th>Blok</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for x in users %}
+      <tr><td><code>{{ x.username }}</code></td><td>{{ x.nama }}</td>
+        <td>{{ 'Admin' if x.role=='admin' else 'Petugas' }}</td>
+        <td>{% for p in rows %}{% if p.id == x.petugas_id %}{{ p.blok }} — {{ p.nama }}{% endif %}{% endfor %}</td>
+        <td>{% if x.aktif %}<span class="badge ok">aktif</span>{% else %}<span class="badge muted">nonaktif</span>{% endif %}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <form method="post" action="{{ url_for('app.user_reset') }}" style="display:inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="id" value="{{ x.id }}">
+            <input type="hidden" name="password" value="{{ 'pbb123' if x.role!='admin' else '' }}"
+                   {% if x.role=='admin' %}required placeholder="password baru"{% endif %}>
+            <button class="btn2 kecil">{{ 'reset pw' if x.role!='admin' else 'ganti pw admin' }}</button>
+          </form>
+        </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="help" style="padding:.6rem 1rem">Bila user baru: centang “buatkan sekalian akun login” pada formulir
+    tambah petugas. Password awal diumumkan langsung ke petugas yang bersangkutan dan wajib diganti
+    (menu <i>ganti password</i> di kanan atas).</div>
+</div>
+{% endblock %}

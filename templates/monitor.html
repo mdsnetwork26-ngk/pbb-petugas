@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% set aktif = 'monitor' %}
+{% block judul %}Papan Progres{% endblock %}
+{% block head %}
+<meta http-equiv="refresh" content="60">
+<style>
+  .papan{background:#0f2434;color:#eaf2fa;border-radius:14px;padding:1.1rem 1.2rem}
+  .papan h1{font-size:1.2rem}
+  .papan table{font-size:.9rem}
+  .papan th{background:#153249;color:#9fc2da;border-color:#22435e}
+  .papan td{border-color:#1d3b52}
+  .papan .bar{background:#1d3b52}
+  .papan .stat{background:#132c3f;border-color:#22435e;color:#eaf2fa}
+  .papan .stat .lbl{color:#9fc2da}
+  .blok-card{background:#132c3f;border:1px solid #22435e;border-radius:12px;padding:.8rem}
+  .blok-card .nm{font-size:1.15rem;font-weight:800}
+  .papan td .badge{border-color:#2c5273;background:#1a3a53;color:#cfe6f5}
+</style>
+{% endblock %}
+{% block isi %}
+<div class="papan">
+  <div class="baru" style="margin-bottom:.7rem">
+    <div><h1 style="color:#fff">Papan Progres PBB-P2 {{ tahun }}</h1>
+      <div style="color:#9fc2da;font-size:.82rem">{{ s.wilayah_desa }} · {{ s.wilayah_kecamatan }} ·
+        {{ s.wilayah_kabupaten }} — diperbarui otomatis tiap menit</div></div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <a class="btn2" href="{{ url_for('app.monitor', tahun=tahun) }}">muat ulang</a>
+    </div>
+  </div>
+  <div class="grid g4" style="margin-bottom:.9rem">
+    <div class="stat"><div class="lbl">SPPT ketetapan</div><div class="val">{{ tot.target_sppt|angka }}</div></div>
+    <div class="stat"><div class="lbl">Lunas</div><div class="val" style="color:#5cd6a4">{{ tot.lunas_sppt|angka }}</div>
+      <div class="bar"><span style="width:{{ tot.persen_sppt }}%"></span></div>
+      <div class="sub">{{ tot.persen_sppt }}% capaian</div></div>
+    <div class="stat"><div class="lbl">Dalam proses</div><div class="val" style="color:#f2c14e">{{ tot.proses_sppt|angka }}</div></div>
+    <div class="stat"><div class="lbl">Nilai terealisasi</div><div class="val">{{ tot.lunas_nilai|rp }}</div>
+      <div class="sub">dari target {{ tot.target_nilai|rp }}</div></div>
+  </div>
+  <div class="tabel-scroll" style="max-height:56vh">
+    <table>
+      <thead><tr><th>Blok</th><th>Petugas</th><th class="num">SPPT</th><th class="num">Lunas</th>
+        <th class="num">Proses</th><th class="num">Belum</th><th style="width:20%">Capaian SPPT</th>
+        <th class="num">Terealisasi</th><th class="num">Setoran petugas</th><th class="num">Bayar mandiri</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr><td><b>{{ r.blok }}</b></td><td>{{ r.nama }}</td>
+          <td class="num">{{ r.target_sppt }}</td><td class="num">{{ r.lunas_sppt }}</td>
+          <td class="num">{{ r.proses_sppt }}</td><td class="num">{{ r.belum_sppt }}</td>
+          <td><div class="bar"><span style="width:{{ r.persen_sppt }}%"></span></div>
+            <div style="color:#9fc2da;font-size:.75rem">{{ r.persen_sppt }}% · {{ r.persen_rp }}% nilai</div></td>
+          <td class="num">{{ r.lunas_nilai|rp }}</td>
+          <td class="num">{{ r.via_petugas_rp|rp }}</td>
+          <td class="num">{{ r.bayar_sendiri_rp|rp }}</td></tr>
+      {% else %}
+        <tr><td colspan="10" style="text-align:center;color:#9fc2da;padding:1.4rem">Belum ada data ketetapan.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="note" style="margin-top:.8rem">
+  Papan ini bisa dibuka dari HP petugas: <b>http://IP-KOMPUTER-ANDA:{{ port }}</b>{{ url_for('app.monitor') }}
+  — hanya perlu login untuk bagian lainnya.
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% set aktif = 'pindah' %}
+{% block judul %}Pindah Blok{% endblock %}
+{% block isi %}
+<h1>{% if is_admin %}Persetujuan Pindah Blok Wajib Pajak{% else %}Ajukan Pindah Blok{% endif %}</h1>
+<div class="help" style="margin-bottom:.8rem">
+  Wajib pajak pindah rumah/keluar wilayah? Petugas mengajukan pemindahan NOP ke blok lain —
+  tagihan &amp; riwayatnya ikut pindah setelah {% if is_admin %}Anda menyetujui{% else %}admin menyetujui{% endif %}.
+  Usulan baru tetap menunggu; NOP tetap dipegang blok lama sampai disetujui.
+</div>
+
+{% if not is_admin %}
+<div class="card">
+  <h2 style="margin-bottom:.5rem">Ajukan pemindahan</h2>
+  <form method="post" action="{{ url_for('app.pindah_ajukan') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div class="row">
+      {% if tag %}
+      <div>
+        <label class="lbl">NOP yang dipindah</label>
+        <input value="{{ tag.nop }} — {{ tag.nama_wp }} (blok {{ tag.petugas_blok or '—' }})" disabled>
+        <input type="hidden" name="tagihan_id" value="{{ tag.id }}">
+      </div>
+      {% else %}
+      <div>
+        <label class="lbl">NOP tanggungan Anda</label>
+        <select name="tagihan_id" required>
+          <option value="">— pilih NOP —</option>
+          {% for t in pilihan %}
+          <option value="{{ t.id }}">{{ t.nop }} · {{ t.nama_wp }} · {{ (t.pokok + t.denda)|rp }}</option>
+          {% endfor %}
+        </select>
+        <div class="help">{% if pilihan %}{{ pilihan|length }} NOP belum tercatat bayar{% if not pilihan %} — belum ada{% endif %}{% else %}belum ada NOP yang bisa diajukan (semua sudah tercatat bayar atau belum ada data){% endif %}</div>
+      </div>
+      {% endif %}
+      <div>
+        <label class="lbl">Pindah ke blok</label>
+        <select name="petugas_baru" required>
+          <option value="">— pilih blok tujuan —</option>
+          {% for p in petugas %}
+          <option value="{{ p.id }}" {{ 'disabled' if tag and p.id == tag.petugas_id }}>Blok {{ p.blok }} · {{ p.nama }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <div style="flex:2"><label class="lbl">Alasan (untuk admin)</label>
+        <input name="alasan" placeholder="mis. WP pindah rumah ke Ganggo Hilir utara"></div>
+    </div>
+    <div style="margin-top:.8rem"><button class="btn">Kirim usulan</button>
+      {% if tag %}<a class="btn2" href="{{ url_for('app.pindah_page') }}">Batal</a>{% endif %}</div>
+  </form>
+</div>
+{% endif %}
+
+<div class="card pad0">
+  <div class="head"><h2>{% if is_admin %}Semua usulan{% else %}Usulan Anda{% endif %}</h2>
+    {% if is_admin %}<span class="badge {{ 'warn' if usulan|selectattr('status', 'equalto', 'menunggu')|list|length else 'muted' }}">
+      {{ usulan|selectattr('status', 'equalto', 'menunggu')|list|length }} menunggu keputusan</span>{% endif %}</div>
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr><th>NOP</th><th>Wajib Pajak</th><th>Dari blok</th><th>Ke blok</th>
+        <th>Alasan</th><th>Diajukan</th><th>Status</th>{% if is_admin %}<th>Keputusan</th>{% endif %}</tr></thead>
+      <tbody>
+      {% for u in usulan %}
+        <tr>
+          <td class="nop"><a href="{{ url_for('app.tagihan_detail', tag_id=u.tagihan_id) }}">{{ u.nop }}</a></td>
+          <td><b>{{ u.nama_wp }}</b><br><span class="help">{{ (u.pokok + u.denda)|rp }} · TP {{ u.tahun_pajak }}</span></td>
+          <td>{{ u.blok_lama or '—' }}</td>
+          <td><b>{{ u.blok_baru or '?' }}</b></td>
+          <td class="help">{{ u.alasan or '—' }}{% if u.catatan_admin %}<br><i>admin: {{ u.catatan_admin }}</i>{% endif %}</td>
+          <td class="help">{{ u.diajukan_oleh }}<br>{{ u.diajukan_pada }}</td>
+          <td>
+            {% if u.status == 'menunggu' %}<span class="badge warn">Menunggu</span>
+            {% elif u.status == 'disetujui' %}<span class="badge ok">Disetujui</span>
+            {% else %}<span class="badge bad">Ditolak</span>{% endif %}
+          </td>
+          {% if is_admin %}
+          <td style="width:1%;white-space:nowrap">
+            {% if u.status == 'menunggu' %}
+            <form method="post" action="{{ url_for('app.pindah_putuskan', usulan_id=u.id) }}" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              <input type="hidden" name="catatan" value="">
+              <button class="btn kecil" name="keputusan" value="setuju" title="Pindahkan NOP ke blok baru">&#10003; Setujui</button>
+            </form>
+            <form method="post" action="{{ url_for('app.pindah_putuskan', usulan_id=u.id) }}" style="display:inline"
+                  onsubmit="this.catatan.value = (this.catatan.value || prompt('Alasan penolakan (opsional):') || '')">
+              <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              <input type="hidden" name="catatan" value="">
+              <button class="btn2 kecil" name="keputusan" value="tolak" title="Tolak usulan">&times; Tolak</button>
+            </form>
+            {% else %}<span class="help">{{ u.diputuskan_pada or '' }}</span>{% endif %}
+          </td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="{{ 8 if is_admin else 7 }}" class="kosong">Belum ada usulan pindah blok.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

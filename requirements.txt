@@ -1,0 +1,9 @@
+# Aplikasi Penerimaan Pembayaran PBB-P2 (Petugas Pemungut - 7 Blok)
+# Versi = persis yang dipakai saat aplikasi ini dibuat & diuji (Python 3.13).
+# Butuh Python >=3.9 (Flask 3.1.3, Werkzeug 3.1.8, reportlab 5.0.1, waitress 3.0.2).
+# Di Python 3.8 pakai: pip install "Flask==2.3.3" "reportlab==4.1.0" "waitress==2.1.2" openpyxl
+# Install:  python -m venv .venv  &&  .venv\Scripts\pip install -r requirements.txt
+Flask==3.1.3
+openpyxl==3.1.5
+reportlab==5.0.1
+waitress==3.0.2

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% set aktif = 'transaksi' %}
+{% block judul %}Transaksi{% endblock %}
+{% block isi %}
+<h1>Transaksi pembayaran</h1>
+<div class="help" style="margin-bottom:.7rem">Setiap baris = satu uang yang Anda terima.
+  Selisih antara kwitansi dan realisasi eSPPT akan menampakkan diri di sini lewat statusnya.</div>
+
+<form class="card" method="get" style="margin-bottom:.9rem">
+  <div class="row">
+    <div class="sempit"><label class="lbl">Tahun</label><input name="tahun" value="{{ tahun }}"></div>
+    <div><label class="lbl">Dari tanggal</label><input type="date" name="dari" value="{{ arg_dari }}"></div>
+    <div><label class="lbl">Sampai</label><input type="date" name="sampai" value="{{ arg_sampai }}"></div>
+    <div><label class="lbl">Metode</label>
+      <select name="metode"><option value="">— semua —</option>
+        {% for k, t in [('petugas','Tunai petugas'),('bank','Bank/loket'),('pos','Kantor Pos'),('wp','Transfer/QRIS')] %}
+        <option value="{{ k }}" {{ 'selected' if metode==k }}>{{ t }}</option>{% endfor %}</select></div>
+    <div><label class="lbl">Status</label>
+      <select name="status"><option value="">— semua —</option>
+        {% for k, (t, _) in STATUS.items() %}<option value="{{ k }}" {{ 'selected' if status_s==k }}>{{ t }}</option>{% endfor %}</select></div>
+    <div class="sempit"><button class="btn" style="width:100%">Terapkan</button></div>
+    <div class="sempit" style="flex:0 0 auto"><a class="btn2" href="?tahun={{ tahun }}&format=csv">Ekspor CSV</a></div>
+  </div>
+</form>
+
+<div class="card pad0">
+  <div class="head"><h2>{{ rows|length }} transaksi ditampilkan</h2>
+    <div class="num">total diterima <b>{{ total|rp }}</b></div></div>
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr><th>Tanggal</th><th>Kwitansi</th><th>NOP</th><th>Wajib Pajak</th><th>Blok</th>
+        <th class="num">Terutang</th><th class="num">Diterima</th><th>Status eSPPT</th>
+        <th>Billing</th><th></th></tr></thead>
+      <tbody>
+      {% for b in rows %}
+        <tr id="bar{{ b.id }}" {% if b.void %}style="opacity:.45"{% endif %}>
+          <td style="white-space:nowrap">{{ b.tgl_bayar|tgl }}</td>
+          <td>{% if b.nomor_kwitansi %}<a href="{{ url_for('app.kwitansi', pid=b.id) }}">{{ b.nomor_kwitansi }}</a>{% else %}—{% endif %}</td>
+          <td class="nop"><a href="{{ url_for('app.tagihan_detail', tag_id=b.tagihan_id) }}">{{ b.nop }}</a></td>
+          <td>{{ b.nama_wp }}</td>
+          <td>{{ b.blok or '—' }}</td>
+          <td class="num">{{ (b.pokok + b.denda)|rp }}</td>
+          <td class="num"><b>{{ b.jumlah_diterima|rp }}</b></td>
+          <td>
+            <span class="badge {{ status_kelas(b.status) }}">{{ status_label(b.status) }}</span>
+            {% if b.tgl_verifikasi %}<div class="help">lunas {{ b.tgl_verifikasi|tgl }}</div>{% endif %}
+          </td>
+          <td class="nop">{{ b.billing_code or '—' }}</td>
+          <td style="white-space:nowrap;text-align:right">
+            {% if b.nomor_kwitansi %}<a class="btn2 kecil" href="{{ url_for('app.kwitansi', pid=b.id) }}">cetak</a>{% endif %}
+            {% if is_admin and not b.void %}
+            <a class="btn2 kecil" href="#edit{{ b.id }}">ubah</a>
+            <form method="post" action="{{ url_for('app.batalkan', pid=b.id) }}" style="display:inline"
+                  onsubmit="return confirm('Batalkan transaksi ini?')">
+              <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+              <button class="btn2 kecil" style="color:var(--bad)">batal</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% if is_admin and not b.void %}
+        <tr id="edit{{ b.id }}" style="background:#fbfcfe"><td colspan="10" style="padding-top:0">
+          <form method="post" action="{{ url_for('app.transaksi_edit', pid=b.id) }}" class="row" style="align-items:end">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <div style="flex:0 0 150px"><label class="lbl">Tanggal</label>
+              <input type="date" name="tgl_bayar" value="{{ b.tgl_bayar }}"></div>
+            <div style="flex:0 0 150px"><label class="lbl">Jumlah diterima</label>
+              <input name="jumlah" value="{{ b.jumlah_diterima }}" inputmode="numeric"></div>
+            <div style="flex:0 0 150px"><label class="lbl">Metode</label>
+              <select name="metode">{% for k in ['petugas','bank','pos','wp','lainnya'] %}
+                <option value="{{ k }}" {{ 'selected' if b.metode==k }}>{{ k }}</option>{% endfor %}</select></div>
+            <div><label class="lbl">Status setoran</label>
+              <select name="status">{% for k, (t, _) in STATUS.items() %}
+                <option value="{{ k }}" {{ 'selected' if b.status==k }}>{{ t }}</option>{% endfor %}</select></div>
+            <div style="flex:0 0 170px"><label class="lbl">Kode billing</label>
+              <input name="billing_code" value="{{ b.billing_code }}"></div>
+            <div><label class="lbl">Diterima dari</label><input name="pembayar" value="{{ b.pembayar }}"></div>
+            <div class="lebar"><label class="lbl">Catatan</label><input name="catatan" value="{{ b.catatan }}"></div>
+            <div style="flex:0 0 auto"><button class="btn2">Simpan</button></div>
+          </form>
+        </td></tr>
+        {% endif %}
+      {% else %}
+        <tr><td colspan="10" class="kosong">Belum ada transaksi. Buka <a href="{{ url_for('app.data_pajak') }}">Data Ketetapan</a>,
+          cari NOP, lalu klik <b>Rekam Bayar</b>.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

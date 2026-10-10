@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set aktif = 'data' %}
+{% block judul %}Rekam Pembayaran{% endblock %}
+{% block isi %}
+<div class="baru">
+  <div>
+    <h1>Rekam Pembayaran &amp; Cetak Kwitansi</h1>
+    <div class="help">NOP <span class="nop">{{ t.nop }}</span> · Tahun Pajak {{ t.tahun_pajak }} ·
+      {% if t.petugas_blok %}Blok {{ t.petugas_blok }} ({{ t.petugas_nama }}){% else %}<b style="color:var(--warn)">belum dipetakan ke petugas blok</b>{% endif %}</div>
+  </div>
+  <a class="btn2" href="{{ url_for('app.data_pajak', cari=t.nop) }}">&larr; kembali ke data</a>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h2 style="margin-bottom:.5rem">Data ketetapan</h2>
+    <table>
+      <tr><th>Nama Wajib Pajak</th><td><b>{{ t.nama_wp }}</b></td></tr>
+      <tr><th>Alamat Objek</th><td>{{ t.alamat_objek }}</td></tr>
+      <tr><th>Alamat WP</th><td>{{ t.alamat_wp or '—' }}</td></tr>
+      <tr><th>Luas Bumi / Bangunan</th><td>{{ t.luas_bumi|round|int }} m² / {{ t.luas_bangunan|round|int }} m²</td></tr>
+      <tr><th>PBB terutang</th><td class="num" style="font-size:1.05rem"><b>{{ t.pokok|rp }}</b></td></tr>
+      <tr><th>Denda (bila ada)</th><td class="num">{{ t.denda|rp }}</td></tr>
+      <tr><th>Total harus dibayar</th><td class="num" style="font-size:1.15rem;color:var(--brand2)"><b>{{ tagihan_total|rp }}</b></td></tr>
+      {% if t.keterangan %}<tr><th>Keterangan</th><td class="help">{{ t.keterangan }}</td></tr>{% endif %}
+    </table>
+    <div class="note" style="margin-top:.6rem">
+      Kwitansi bernomor urut otomatis (nomor <b>{{ 'MM/' ~ t.tahun_pajak ~ '/NNN' }}</b>) dan langsung
+      masuk ke <a href="{{ url_for('app.billing') }}">antrean billing eSPPT</a> setelah disimpan.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:.5rem">Formulir pembayaran</h2>
+    <form method="post" action="{{ url_for('app.bayar', tag_id=t.id) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div class="row">
+        <div><label class="lbl">Tanggal terima uang</label>
+          <input type="date" name="tgl_bayar" value="{{ hari_ini }}" required></div>
+        <div><label class="lbl">Diterima dari</label>
+          <input name="pembayar" value="{{ t.nama_wp }}" placeholder="nama penyetor / kuasa"></div>
+      </div>
+      <div class="row" style="margin-top:.5rem">
+        <div><label class="lbl">Jumlah diterima (Rp)</label>
+          <input name="jumlah" value="{{ tagihan_total }}" inputmode="numeric" required
+                 oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+          <div class="help">boleh kurang/lebih bila ada potongan atau setor sebagian — selisihnya akan
+            terlihat di laporan.</div></div>
+        <div><label class="lbl">Metode / jalur bayar</label>
+          <select name="metode">
+            <option value="petugas">Tunai diterima petugas blok (terbitkan kwitansi)</option>
+            <option value="bank">WP bayar sendiri ke bank/pos/loket</option>
+            <option value="pos">Kantor Pos</option>
+            <option value="wp">Transfer / QRIS / lainnya</option>
+          </select></div>
+      </div>
+      {% if is_admin %}
+      <div class="row" style="margin-top:.5rem">
+        <div><label class="lbl">Dicatat oleh petugas</label>
+          <select name="petugas_id"><option value="">— pilih —</option>
+            {% for p in petugas %}<option value="{{ p.id }}" {{ 'selected' if p.id == t.petugas_id }}>
+              {{ p.blok }} · {{ p.nama }}</option>{% endfor %}</select></div>
+        <div><label class="lbl">Catatan</label>
+          <input name="catatan" placeholder="mis. WP minta kwitansi rangkap"></div>
+      </div>
+      {% else %}
+      <input type="hidden" name="petugas_id" value="{{ pid or '' }}">
+      {% endif %}
+      <div style="margin-top:.9rem;display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn" type="submit">Simpan &amp; buka kwitansi</button>
+        <a class="btn2" href="{{ url_for('app.data_pajak') }}">Batal</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

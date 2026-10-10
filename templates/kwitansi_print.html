@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% set aktif = 'kwitansi' %}
+{% block judul %}Kwitansi {{ d.nomor }}{% endblock %}
+{% block head %}
+<style>
+  .kw { background:#fff; width:210mm; margin:0 auto; padding:14mm 18mm; color:#000;
+        font-family:"Times New Roman",Georgia,serif; font-size:11.5pt; line-height:1.5;
+        border:1px solid #e5e7eb; box-shadow:var(--shadow); }
+  .kw .kop { text-align:center; border-bottom:3px double #123; padding-bottom:2mm; }
+  .kw .kop .l1 { font-size:13pt; font-weight:700; letter-spacing:.3px }
+  .kw .kop .l2 { font-size:12pt; font-weight:700 }
+  .kw .kop .l3 { font-size:13.5pt; font-weight:700 }
+  .kw .kop .alm { font-size:8.5pt; font-weight:400; margin-top:1mm }
+  .kw .judul { text-align:center; margin:6mm 0 3mm }
+  .kw .judul b { font-size:13pt; text-decoration:underline; letter-spacing:.4px }
+  .kw .nomor { font-size:10pt; margin-top:1mm }
+  .kw .isi { border:1px solid #9aa4b2; padding:5mm 6mm; margin-top:4mm; break-inside:avoid }
+  .kw .kiri { width:61%; display:inline-block; vertical-align:top; padding-right:3mm }
+  .kw .kanan { width:38%; display:inline-block; vertical-align:top; text-align:center }
+  .kw .baris { display:flex; gap:2mm; margin-bottom:1.2mm; align-items:baseline }
+  .kw .baris .k { width:39mm; flex:0 0 39mm; color:#333; font-size:9.8pt; white-space:nowrap }
+  .kw .baris .v { flex:1; font-size:11.5pt }
+  .kw h4, .kw .ttl-ttd { font-size:10pt; font-weight:400; margin:0 }
+  .kw .garis { border-bottom:1px dotted #6b7280; min-height:6mm; display:block }
+  .kw .total .v { font-weight:700; font-size:13pt }
+  .kw .terbilang { font-style:italic; text-transform:lowercase; font-size:10.5pt }
+  .kw .ttd { margin-top:8mm }
+  .kw .ttd .sp { height:18mm }
+  .kw .jeda-ttd { height:20mm }
+  .kw .nama { font-weight:700; border-top:1px solid #333; padding-top:1.2mm; display:inline-block; min-width:46mm }
+  .kw .nama.ring { font-weight:400; border:0; }
+  .kw .catat { margin-top:6mm; border-top:1px solid #9aa4b2; padding-top:2.5mm; font-size:8.5pt; color:#374151 }
+  .kw table.nilai { width:100%; border-collapse:collapse; margin:2mm 0 1mm }
+  .kw table.nilai td { border:0; padding:.6mm 0; font-size:11pt }
+  .kw table.nilai td.r { text-align:right; font-variant-numeric:tabular-nums }
+  @media print { .kw { border:0; box-shadow:none; padding:6mm 10mm; width:auto } }
+</style>
+{% endblock %}
+{% block isi %}
+<div class="row tanpa-cetak" style="margin-bottom:.8rem;align-items:center">
+  <div style="flex:0 0 auto;display:flex;gap:.4rem;flex-wrap:wrap">
+    <button class="btn" onclick="window.print()">Cetak kwitansi (A4)</button>
+    <a class="btn2" href="{{ url_for('app.kwitansi_pdf', pid=row.id, unduh=1) }}">Unduh PDF</a>
+    <a class="btn2" href="{{ url_for('app.kwitansi_pdf', pid=row.id) }}" target="_blank">Lihat PDF</a>
+    {% if is_admin %}<a class="btn2" href="{{ url_for('app.transaksi', tahun=row.tahun_pajak or d.tahun) }}#bar{{ row.id }}">koreksi data</a>{% endif %}
+  </div>
+  <div class="help" style="flex:1">
+    Status setoran: <span class="badge {{ status_kelas(row.status) }}">{{ status_label(row.status) }}</span>
+    {% if row.billing_code %}· kode billing <code>{{ row.billing_code }}</code>{% endif %}
+    · <a href="{{ url_for('app.tagihan_detail', tag_id=row.tagihan_id) }}">lihat NOP</a>
+  </div>
+</div>
+{% if row.status != 'terverifikasi' %}
+<div class="note warn tanpa-cetak" style="margin-bottom:.7rem">
+  Kwitansi ini <b>belum tercatat lunas</b> di data realisasi eSPPT.
+  {% if row.status == 'menunggu_billing' %}Langkah berikutnya: buat billing di eSPPT untuk NOP ini
+    (<a href="{{ url_for('app.billing') }}">antrean billing</a>).{% endif %}
+  {% if row.status == 'terkirim' %}Setorkan sesuai kode billing, lalu jalankan sinkron realisasi
+    (<a href="{{ url_for('app.impor') }}">impor / sinkron</a>).{% endif %}
+</div>
+{% endif %}
+
+<article class="kw">
+  <div class="kop">
+    <div class="l1">{{ d.kop1 }}</div>
+    <div class="l2">{{ d.kop2 }}</div>
+    <div class="l3">{{ d.kop3 }}</div>
+    <div class="alm">Sekretariat: {{ s.alamat_kantor or 'Kantor ' ~ s.wilayah_desa }} ·
+      Layanan PBB-P2: {{ s.no_rekening or 'setor tunai ke petugas pemungut' }}</div>
+  </div>
+
+  <div class="judul">
+    <b>KWITANSI PEMBAYARAN PBB-P2</b>
+    <div class="nomor">Nomor: {{ d.nomor }} &nbsp;·&nbsp; {{ s.wilayah_desa }}, {{ d.tgl_cetak }}</div>
+  </div>
+
+  <div class="isi">
+    <div class="kiri">
+      <div class="baris"><span class="k">Telah diterima dari</span><span class="v">: {{ d.pembayar }}</span></div>
+      <div class="baris"><span class="k">Untuk pembayaran</span><span class="v">: PBB-P2 Tahun Pajak {{ d.tahun }}</span></div>
+      <div class="baris"><span class="k">Nomor Objek Pajak</span><span class="v">: <b class="nop" style="font-family:ui-monospace,Consolas,monospace">{{ d.nop }}</b></span></div>
+      <div class="baris"><span class="k">Tahun Pajak</span><span class="v">: {{ d.tahun }}</span></div>
+      <div class="baris"><span class="k">Nama Wajib Pajak</span><span class="v">: {{ d.nama_wp }}</span></div>
+      <div class="baris"><span class="k">Alamat objek pajak</span><span class="v">: {{ d.alamat }}</span></div>
+      <table class="nilai">
+        <tr><td style="width:48%">PBB terutang {% if d.denda_rp %}+ denda {% endif %}</td>
+            <td class="r">{{ d.pokok }}{% if d.denda_rp %} + {{ d.denda }}{% endif %}</td></tr>
+        <tr class="total"><td style="border-top:1px solid #000;padding-top:1mm">Jumlah yang diterima</td>
+            <td class="r" style="border-top:1px solid #000;padding-top:1mm">{{ d.jumlah }}</td></tr>
+      </table>
+      <div class="terbilang">Terbilang: <b>{{ d.terbilang }}</b></div>
+      {% if (d.jumlah_rp - (d.pokok_rp + d.denda_rp))|abs > 1000 %}
+      <div class="help" style="font-size:9pt">
+        {% if d.jumlah_rp > (d.pokok_rp + d.denda_rp) %}
+        Selisih lebih {{ (d.jumlah_rp - d.pokok_rp - d.denda_rp)|rp }} dicatat sebagai setor untuk tahun/objek lain
+        atau titipan — akan ditelusuri pada rekonsiliasi.
+        {% else %}
+        Dibayar sebagian: kekurangan {{ (d.pokok_rp + d.denda_rp - d.jumlah_rp)|rp }} masih menjadi utang tahun {{ d.tahun }}.
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if d.billing %}<div style="margin-top:2mm;font-size:10pt">Kode billing eSPPT: <b>{{ d.billing }}</b></div>{% endif %}
+    </div>
+    <div class="kanan">
+      <div>Menyetor,</div>
+      <div class="sp"></div>
+      <div><span class="nama ring">( Wajib Pajak / Kuasa )</span></div>
+      <div class="jeda-ttd"></div>
+      <div class="ttl-ttd">Petugas Pemungut PBB-P2{% if d.blok %} — {{ d.blok }}{% endif %},</div>
+      <div class="sp"></div>
+      <div><span class="nama">{{ d.petugas_nama }}</span></div>
+      {% if d.petugas_nip %}<div style="font-size:9pt">NIP. {{ d.petugas_nip }}</div>{% endif %}
+      {% if d.lurah_nama %}
+        <div style="height:6mm"></div>
+        <div style="font-size:10pt">Mengetahui,</div>
+        <div style="font-size:10pt">{{ s.jabatan_lurah or 'Lurah / Kepala Desa' }}</div>
+        <div class="sp"></div>
+        <div><span class="nama">{{ d.lurah_nama }}</span></div>
+        {% if d.lurah_nip %}<div style="font-size:9pt">NIP. {{ d.lurah_nip }}</div>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="catat">
+    Uang setoran ini wajib disetorkan ke rekening kas daerah / kode billing eSPPT paling lambat
+    {{ s.cuti }} hari kerja setelah diterima. Bukti ini sah selama nomor kwitansi dan kode verifikasi
+    terverifikasi pada aplikasi loket.
+    <br><b>Kode verifikasi kwitansi: {{ d.cek_kode }}</b> · cek keaslian di halaman
+    <code>/cek?nomor={{ d.nomor }}</code> · {{ d.catatan }}
+  </div>
+</article>
+
+<div class="tanpa-cetak note" style="margin-top:.8rem">
+  <b>Tips:</b> bila printer tidak mau mencetak pas satu halaman, di dialog cetak pilih
+  skala <i>Default</i> (bukan Fit to page), matikan <i>Headers and footers</i>, dan ukuran A4.
+  Versi PDF di atas sudah terkunci satu halaman.
+</div>
+{% endblock %}

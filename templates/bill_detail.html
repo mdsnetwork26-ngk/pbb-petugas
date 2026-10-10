@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% set aktif = 'data' %}
+{% block judul %}{{ t.nop }}{% endblock %}
+{% block isi %}
+<div class="baru">
+  <div>
+    <h1>{{ t.nama_wp }}</h1>
+    <div class="help"><span class="nop">{{ t.nop }}</span> · Tahun Pajak {{ t.tahun_pajak }} ·
+      Blok {{ t.petugas_blok or '—' }}{% if t.petugas_nama %} ({{ t.petugas_nama }}){% endif %} ·
+      Bumi {{ t.luas_bumi|round|int }} m² / Bangunan {{ t.luas_bangunan|round|int }} m²</div>
+  </div>
+  <div class="row" style="flex:0 1 auto">
+    {% if t.pembayaran_id %}
+      <a class="btn" href="{{ url_for('app.kwitansi', pid=t.pembayaran_id) }}">Buka / cetak kwitansi</a>
+    {% else %}
+      <a class="btn" href="{{ url_for('app.bayar', tag_id=t.id) }}">Rekam pembayaran</a>
+    {% endif %}
+    <a class="btn2" href="{{ url_for('app.data_pajak', tahun=t.tahun_pajak) }}">Kembali ke daftar</a>
+  </div>
+</div>
+
+<div class="grid g4" style="margin-bottom:.9rem">
+  <div class="stat"><div class="lbl">PBB terutang</div><div class="val">{{ t.pokok|rp }}</div>
+    <div class="sub">denda {{ t.denda|rp }}</div></div>
+  <div class="stat"><div class="lbl">Uang diterima</div><div class="val">{{ t.dibayar|rp }}</div>
+    <div class="sub">dari {{ t.bayar_status or 'belum ada' }}</div></div>
+  <div class="stat"><div class="lbl">Status tagihan</div>
+    <div class="val" style="font-size:1rem">
+      {% if t.status == 'lunas' %}<span class="badge ok">LUNAS — cocok dengan realisasi eSPPT</span>
+      {% elif t.status == 'proses' %}<span class="badge warn">{{ status_label(t.bayar_status) }}</span>
+      {% else %}<span class="badge muted">Belum bayar</span>{% endif %}</div>
+    {% if t.nomor_kwitansi %}<div class="sub">kwitansi {{ t.nomor_kwitansi }} · {{ t.tgl_bayar|tgl }}</div>{% endif %}</div>
+  <div class="stat"><div class="lbl">Alamat objek pajak</div>
+    <div class="val" style="font-size:.85rem;font-weight:500;line-height:1.35">{{ t.alamat_objek }}</div>
+    <div class="sub">Alamat WP: {{ t.alamat_wp or '—' }}</div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card pad0">
+    <div class="head"><h2>Riwayat pembayaran NOP ini</h2></div>
+    <table>
+      <thead><tr><th>Kwitansi</th><th>Tanggal</th><th class="num">Diterima</th><th>Metode</th>
+        <th>Status</th><th>Kode billing</th><th></th></tr></thead>
+      <tbody>
+      {% for b in bayar %}
+        <tr {% if b.void %}style="opacity:.5;text-decoration:line-through"{% endif %}>
+          <td>{{ b.nomor_kwitansi or '—' }}</td>
+          <td>{{ b.tgl_bayar|tgl }}</td>
+          <td class="num">{{ b.jumlah_diterima|rp }}</td>
+          <td>{{ b.metode }}{% if b.petugas_nama %}<br><span class="help">{{ b.blok }} · {{ b.petugas_nama }}</span>{% endif %}</td>
+          <td><span class="badge {{ status_kelas(b.status) }}">{{ status_label(b.status) }}</span></td>
+          <td class="nop">{{ b.billing_code or '—' }}</td>
+          <td style="white-space:nowrap">
+            {% if b.nomor_kwitansi and not b.void %}
+              <a class="btn2 kecil" href="{{ url_for('app.kwitansi', pid=b.id) }}">cetak</a>{% endif %}
+            {% if is_admin and not b.void %}
+              <form method="post" action="{{ url_for('app.batalkan', pid=b.id) }}" style="display:inline"
+                    onsubmit="return confirm('Batalkan transaksi {{ b.nomor_kwitansi or b.id }}? Kwitansi menjadi tidak berlaku.')">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <button class="btn2 kecil" type="submit">batal</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% if b.catatan %}<tr><td colspan="7" class="help">Catatan: {{ b.catatan }}</td></tr>{% endif %}
+      {% else %}
+        <tr><td colspan="7" class="kosong">Belum ada pembayaran tercatat.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid" style="align-content:start;gap:.9rem">
+    <div class="card pad0">
+      <div class="head"><h2>Jejak realisasi eSPPT</h2><span class="help">hasil impor/sinkron</span></div>
+      <table>
+        <thead><tr><th>Tanggal bayar</th><th class="num">Pokok</th><th class="num">Denda</th>
+          <th class="num">Jumlah</th><th>Channel</th></tr></thead>
+        <tbody>
+        {% for r in real %}
+          <tr><td>{{ r.tgl_bayar|tgl }}</td><td class="num">{{ r.pokok|rp }}</td>
+            <td class="num">{{ r.denda|rp }}</td><td class="num"><b>{{ r.jumlah|rp }}</b></td>
+            <td>{{ r.channel or '—' }}</td></tr>
+        {% else %}
+          <tr><td colspan="5" class="kosong">NOP ini belum muncul di data realisasi.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card pad0">
+      <div class="head"><h2>Log aktivitas billing</h2></div>
+      <table>
+        <thead><tr><th>Waktu</th><th>Aksi</th><th class="num">HTTP</th><th>Hasil</th></tr></thead>
+        <tbody>
+        {% for l in log %}
+          <tr><td style="white-space:nowrap">{{ l.created_at }}</td><td>{{ l.aksi }}</td>
+            <td class="num">{{ l.http_status or '—' }}</td>
+            <td class="help">{% if l.ok %}<span class="badge ok">ok</span> {% endif %}{{ (l.resp or '')[:90] }}</td></tr>
+        {% else %}
+          <tr><td colspan="4" class="kosong">Belum ada aktivitas otomasi.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_admin %}
+    <div class="card">
+      <h2 style="margin-bottom:.4rem">Koreksi ketetapan</h2>
+      <form method="post" action="{{ url_for('app.tagihan_edit', tag_id=t.id) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <div class="row">
+          <div><label class="lbl">PBB terutang</label>
+            <input name="pokok" value="{{ t.pokok }}" inputmode="numeric"></div>
+          <div><label class="lbl">Denda</label>
+            <input name="denda" value="{{ t.denda }}" inputmode="numeric"></div>
+        </div>
+        <div class="row" style="margin-top:.4rem">
+          <div><label class="lbl">Catatan</label><input name="keterangan" value="{{ t.keterangan }}"></div>
+        </div>
+        <div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">
+          <button class="btn2" type="submit">Simpan koreksi</button>
+          <button class="btn2" type="submit" style="color:var(--bad)"
+                  onclick="this.form.action='{{ url_for('app.tagihan_nonaktif', tag_id=t.id) }}';return confirm('Nonaktifkan NOP ini (mutasi/hapus)?')">
+            Nonaktifkan NOP</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

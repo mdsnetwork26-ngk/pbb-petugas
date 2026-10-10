@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% set aktif = 'data' %}
+{% block judul %}Data Ketetapan{% endblock %}
+{% block isi %}
+<h1>Data Ketetapan PBB-P2 {{ tahun }}</h1>
+<div class="help" style="margin-bottom:.7rem">{{ total|angka }} NOP ditampilkan ·
+  {% if not is_admin %}hanya NOP blok Anda{% else %}semua blok{% endif %} ·
+  klik baris untuk melihat riwayat &amp; mencetak</div>
+
+<div class="grid g4" style="margin-bottom:.9rem">
+  <div class="stat">
+    <div class="lbl">Masih harus ditagih</div>
+    <div class="val" style="color:var(--warn);font-size:1.7rem">{{ tagih_rp|rp }}</div>
+    <div class="sub">{{ belum_n|angka }} NOP belum bayar{% if proses_n %} · {{ proses_n|angka }} menunggu verifikasi{% endif %}{% if lunas_n %} · {{ lunas_n|angka }} lunas{% endif %}</div>
+  </div>
+  {% if ada_denda %}
+  <div class="stat">
+    <div class="lbl">Termasuk denda</div>
+    <div class="val" style="color:var(--bad)">{{ denda_rp|rp }}</div>
+    <div class="sub">denda berjalan setelah bulan jatuh tempo terlampaui</div>
+  </div>
+  {% endif %}
+</div>
+
+<form class="card" method="get" style="margin-bottom:.9rem">
+  <div class="row">
+    <div>
+      <label class="lbl">Cari NOP / nama WP / alamat</label>
+      <input name="cari" value="{{ q }}" placeholder="35.18.010001.0001-0 atau Slamet">
+    </div>
+    <div class="sempit">
+      <label class="lbl">Tahun</label>
+      <input name="tahun" value="{{ tahun }}" style="width:100%">
+    </div>
+    {% if is_admin %}
+    <div>
+      <label class="lbl">Petugas blok</label>
+      <select name="petugas"><option value="">— semua —</option>
+        {% for p in petugas %}<option value="{{ p.id }}" {{ 'selected' if pg==p.id|string }}>{{ p.blok }} · {{ p.nama }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div>
+      <label class="lbl">Status bayar</label>
+      <select name="status"><option value="">— semua —</option>
+        {% for k, t in [('belum','Belum bayar'),('proses','Diterima, belum lunas'),('lunas','Lunas')] %}
+        <option value="{{ k }}" {{ 'selected' if st==k }}>{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="sempit">
+      <label class="lbl">Urutkan</label>
+      <select name="sortir">
+        <option value="">Belum bayar dulu</option>
+        <option value="nop" {{ 'selected' if sortir=='nop' }}>NOP (A&rarr;Z)</option>
+        <option value="nama" {{ 'selected' if sortir=='nama' }}>Nama WP</option>
+        <option value="besar" {{ 'selected' if sortir=='besar' }}>Tagihan terbesar</option>
+        <option value="kecil" {{ 'selected' if sortir=='kecil' }}>Tagihan terkecil</option>
+        <option value="denda" {{ 'selected' if sortir=='denda' }}>Denda terbesar</option>
+        <option value="baru" {{ 'selected' if sortir=='baru' }}>Baru ditambahkan</option>
+      </select>
+    </div>
+    <div class="sempit" style="flex:0 0 130px">
+      <button class="btn" style="width:100%;justify-content:center">Terapkan</button>
+    </div>
+    <div class="sempit" style="flex:0 0 auto">
+      <a class="btn2" href="{{ url_for('app.data_pajak', tahun=tahun) }}">Reset</a>
+    </div>
+  </div>
+</form>
+
+<div class="card pad0">
+  <div class="head">
+    <h2>NOP tagihan</h2>
+    <div class="row" style="gap:.4rem;flex:0 1 auto">
+      <a class="btn2 kecil" href="{{ url_for('app.impor') }}">Impor / perbarui ketetapan</a>
+    </div>
+  </div>
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr>
+        <th>NOP</th><th>Nama Wajib Pajak</th><th class="kolom-hapus">Alamat Objek</th>
+        <th class="num">Bumi</th><th class="num">Bangunan</th><th class="num">PBB Terutang</th>
+        <th>Petugas</th><th>Status</th><th class="num">Diterima</th>{% if ada_denda %}<th class="num">Denda</th>{% endif %}<th>Tgl Bayar</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for t in rows %}
+        <tr>
+          <td class="nop"><a href="{{ url_for('app.tagihan_detail', tag_id=t.id) }}">{{ t.nop }}</a></td>
+          <td><b>{{ t.nama_wp }}</b><br><span class="help">{{ t.alamat_wp }}</span></td>
+          <td class="kolom-hapus help">{{ t.alamat_objek }}</td>
+          <td class="num">{{ t.luas_bumi|round|int }}</td>
+          <td class="num">{{ t.luas_bangunan|round|int }}</td>
+          <td class="num">{{ (t.pokok + t.denda)|rp }}</td>
+          <td>{{ t.petugas_blok or '—' }}</td>
+          <td>
+            {% if t.status == 'lunas' %}<span class="badge ok">Lunas</span>
+            {% elif t.status == 'proses' %}<span class="badge warn">Diproses</span>
+            {% else %}<span class="badge muted">Belum bayar</span>{% endif %}
+          </td>
+          <td class="num">{{ t.dibayar|rp }}</td>
+          {% if ada_denda %}<td class="num" style="color:var(--bad);font-weight:600">{{ t.denda|rp }}</td>{% endif %}
+          <td>{{ t.tgl_bayar|tgl if t.tgl_bayar else '—' }}</td>
+          <td style="width:1%;white-space:nowrap">
+            {% if t.pembayaran_id %}
+              <a class="btn2 kecil" href="{{ url_for('app.kwitansi', pid=t.pembayaran_id) }}">Kwitansi</a>
+            {% else %}
+              <a class="btn kecil" href="{{ url_for('app.bayar', tag_id=t.id) }}">Rekam Bayar</a>
+            {% endif %}
+            <a class="btn2 kecil" href="{{ url_for('app.pindah_page', tag=t.id) }}" title="Usulkan pindah blok wajib pajak">&#8646; Pindah</a>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="{{ 12 if ada_denda else 11 }}" class="kosong">Tidak ada NOP yang cocok. Coba reset filter, atau
+          <a href="{{ url_for('app.impor') }}">impor file ketetapan</a> dulu.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if pages > 1 %}
+  <div class="body" style="display:flex;justify-content:space-between;align-items:center">
+    <div class="help">halaman {{ page }} dari {{ pages }} · {{ total|angka }} baris</div>
+    <div class="row" style="flex:0 0 auto;gap:.4rem">
+      {% if page > 1 %}<a class="btn2 kecil" href="{{ tautan(hal=page-1) }}">&laquo; Sebelumnya</a>{% endif %}
+      {% if page < pages %}<a class="btn2 kecil" href="{{ tautan(hal=page+1) }}">Berikutnya &raquo;</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+{% endblock %}

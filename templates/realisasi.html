@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% set aktif = 'impor' %}
+{% block judul %}Data Realisasi{% endblock %}
+{% block isi %}
+<h1>Data realisasi eSPPT tahun {{ tahun }}</h1>
+<div class="help" style="margin-bottom:.7rem">Isi tabel ini dari file unduhan
+  <code>/realisasi_rekap_lurah</code> (lewat <a href="{{ url_for('app.impor') }}">Impor Data</a>)
+  atau dari sinkron otomatis. Fungsinya: memastikan NOP mana yang <b>benar-benar sudah lunas di kas daerah</b>.</div>
+
+<div class="card pad0">
+  <div class="head"><h2>{{ rows|length }} baris realisasi terbaru</h2>
+    <a class="btn2 kecil" href="{{ url_for('app.impor') }}">impor file baru</a></div>
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr><th>Tanggal bayar</th><th>NOP</th><th>Nama di eSPPT</th><th>Alamat</th>
+        <th class="num">Pokok</th><th class="num">Denda</th><th class="num">Jumlah</th>
+        <th>Channel</th><th>Ketentuan di aplikasi</th><th>Kwitansi</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td style="white-space:nowrap">{{ r.tgl_bayar|tgl }}</td>
+          <td class="nop">{{ r.nop }}</td>
+          <td>{{ r.nama_wp }}</td>
+          <td class="help">{{ r.alamat_wp }}</td>
+          <td class="num">{{ r.pokok|rp }}</td>
+          <td class="num">{{ r.denda|rp }}</td>
+          <td class="num"><b>{{ r.jumlah|rp }}</b></td>
+          <td>{{ r.channel or '—' }}</td>
+          <td>{% if r.nama_ketetapan %}{{ r.nama_ketetapan }}{% if r.blok %} · {{ r.blok }}{% endif %}
+              {% else %}<span class="badge warn">tidak ada di ketetapan</span>{% endif %}</td>
+          <td>{% if r.matched_pembayaran_id %}<span class="badge ok">tercocok</span>
+              {% else %}<span class="badge muted">tanpa kwitansi</span>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" class="kosong">Belum ada data realisasi untuk tahun ini.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

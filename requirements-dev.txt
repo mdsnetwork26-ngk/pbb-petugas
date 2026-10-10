@@ -1,0 +1,4 @@
+# Perlengkapan uji & peninjauan (opsional, tidak dibutuhkan untuk menjalankan aplikasi)
+-r requirements.txt
+pytest==8.3.4
+pymupdf==1.24.10

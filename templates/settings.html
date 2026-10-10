@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% set aktif = 'pengaturan' %}
+{% block judul %}Pengaturan{% endblock %}
+{% block isi %}
+<h1>Pengaturan</h1>
+<div class="row tanpa-cetak" style="margin-bottom:.8rem;gap:.4rem">
+  <a class="btn2 {{ 'btn' if tab=='umum' }}" href="?tab=umum">Identitas &amp; kwitansi</a>
+  <a class="btn2 {{ 'btn' if tab=='esppt' }}" href="?tab=esppt">Sinkronisasi eSPPT</a>
+  <a class="btn2 {{ 'btn' if tab=='denda' }}" href="?tab=denda">Denda &amp; jatuh tempo</a>
+</div>
+
+{% if tab == 'umum' %}
+<form class="card" method="post" action="{{ url_for('app.pengaturan') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <input type="hidden" name="grup" value="umum">
+  <h2>Identitas pencetak kwitansi</h2>
+  <p class="help">Dipakai pada kop &amp; blok tanda tangan bukti bayar.</p>
+  <div class="row">
+    <div><label class="lbl">Kabupaten</label><input name="wilayah_kabupaten" value="{{ s.wilayah_kabupaten }}"></div>
+    <div><label class="lbl">Kecamatan</label><input name="wilayah_kecamatan" value="{{ s.wilayah_kecamatan }}"></div>
+    <div><label class="lbl">Kelurahan / Desa</label><input name="wilayah_desa" value="{{ s.wilayah_desa }}"></div>
+  </div>
+  <div class="row" style="margin-top:.5rem">
+    <div class="lebar"><label class="lbl">Alamat kantor / sekretariat</label>
+      <input name="alamat_kantor" value="{{ s.alamat_kantor }}"></div>
+  </div>
+  <div class="row" style="margin-top:.5rem">
+    <div><label class="lbl">Rekening setoran / tujuan setor</label>
+      <input name="no_rekening" value="{{ s.no_rekening }}" placeholder="mis. Bank Jatim a.n. Kas Daerah — 1234567890"></div>
+    <div class="sempit"><label class="lbl">Batas setor (hari kerja)</label>
+      <input name="cuti" value="{{ s.cuti }}"></div>
+  </div>
+  <hr style="border:0;border-top:1px solid var(--line);margin:.9rem 0">
+  <h2>Pengelola tanda tangan</h2>
+  <div class="row">
+    <div><label class="lbl">Nama Lurah / Kepala Desa</label><input name="nama_lurah" value="{{ s.nama_lurah }}"></div>
+    <div><label class="lbl">NIP</label><input name="nip_lurah" value="{{ s.nip_lurah }}"></div>
+    <div><label class="lbl">Jabatan penandatangan kwitansi</label>
+      <input name="jabatan_penandatangan" value="{{ s.jabatan_penandatangan }}"></div>
+  </div>
+  <div class="row" style="margin-top:.5rem">
+    <div><label class="lbl">Nama petugas (baku, bila blok kosong)</label>
+      <input name="nama_petugas_bendahara" value="{{ s.nama_petugas_bendahara }}"></div>
+    <div><label class="lbl">NIP petugas</label><input name="nip_petugas" value="{{ s.nip_petugas }}"></div>
+  </div>
+  <div class="row" style="margin-top:.5rem">
+    <div class="lebar"><label class="lbl">Catatan kaki kwitansi</label>
+      <input name="catatan_kwitansi" value="{{ s.catatan_kwitansi }}"></div>
+  </div>
+  <div class="help" style="margin-top:.5rem">Nama &amp; NIP tiap blok lebih baik diisi di
+    <a href="{{ url_for('app.petugas_page') }}">menu Petugas</a> — kwitansi otomatis memakai data petugas yang mencatat.</div>
+  <div style="margin-top:.7rem"><button class="btn">Simpan pengaturan</button></div>
+</form>
+{% elif tab == 'denda' %}
+
+<form class="card" method="post" action="{{ url_for('app.pengaturan') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <input type="hidden" name="grup" value="denda">
+  <h2>Denda setelah jatuh tempo</h2>
+  <div class="row">
+    <div class="sempit"><label class="lbl">Jatuh tempo (bulan)</label>
+      <input name="jatuh_tempo_bulan" value="{{ s.jatuh_tempo_bulan }}" inputmode="numeric">
+      <div class="help">1&ndash;12. SPPT umumnya jatuh tempo akhir <b>Agustus</b> &rarr; isi 8.
+        Denda mulai berjalan pada bulan setelahnya.</div></div>
+    <div class="sempit"><label class="lbl">Denda per bulan (%)</label>
+      <input name="denda_persen" value="{{ s.denda_persen }}" inputmode="decimal">
+      <div class="help">persen dari pokok pajak untuk tiap bulan terlampaui</div></div>
+    <div class="sempit"><label class="lbl">Maks. bulan denda</label>
+      <input name="denda_maks_bulan" value="{{ s.denda_maks_bulan }}" inputmode="numeric">
+      <div class="help">batas akumulasi denda (umumnya 24 bulan)</div></div>
+  </div>
+  <div style="margin-top:.7rem"><button class="btn">Simpan &amp; hitung ulang denda</button></div>
+  <div class="note" style="margin-top:.7rem">
+    Kolom <b>Denda</b> otomatis muncul di halaman Data Ketetapan begitu bulan jatuh tempo terlampaui,
+    ikut ditagihkan ke wajib pajak (kwitansi &amp; laporan). Tagihan yang sudah tercatat pembayarannya
+    <b>tidak</b> berubah denda-nya — angka saat kwitansi terbit yang dipakai. Setelah menyimpan,
+    denda seluruh NOP langsung dihitung ulang.
+  </div>
+</form>
+{% else %}
+
+<div class="grid g2" style="align-items:start">
+  <form class="card" method="post" action="{{ url_for('app.pengaturan') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <input type="hidden" name="grup" value="esppt">
+    <h2>Kredensial &amp; jalur data</h2>
+    <label class="check" style="margin:.4rem 0 .6rem"><input type="checkbox" name="esppt_enabled" value="1"
+      {{ 'checked' if s.esppt_enabled=='1' }}> <b>Aktifkan otomatisasi eSPPT</b> (kalau tidak dicentang, aplikasi 100% lokal)</label>
+    <label class="check" style="margin-bottom:.6rem"><input type="checkbox" name="esppt_billing_dry_run" value="1"
+      {{ 'checked' if s.esppt_billing_dry_run=='1' }}> Mode simulasi — uji koneksi/tarik data boleh, <b>tombol buat billing tidak menembak eSPPT</b></label>
+    <div class="row">
+      <div><label class="lbl">Base URL</label><input name="esppt_base_url" value="{{ s.esppt_base_url }}"></div>
+      <div class="sempit"><label class="lbl">Timeout (dtk)</label><input name="esppt_http_timeout" value="{{ s.esppt_http_timeout }}"></div>
+      <div class="sempit"><label class="lbl">Jeda antar NOP (ms)</label><input name="esppt_delay_ms" value="{{ s.esppt_delay_ms }}"></div>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <div><label class="lbl">User eSPPT (Petugas PBB / Lurah)</label><input name="esppt_user" value="{{ s.esppt_user }}" autocomplete="off"></div>
+      <div><label class="lbl">Password</label><input name="esppt_password" type="password" value="{{ s.esppt_password }}" autocomplete="new-password"></div>
+    </div>
+    <div class="help" style="margin-top:.3rem">Bisa juga tanpa disimpan di aplikasi: set variabel lingkungan
+      <code>PBB_ESPPT_USER</code> &amp; <code>PBB_ESPPT_PASSWORD</code> (lebih aman).</div>
+    <div class="row" style="margin-top:.5rem">
+      <div><label class="lbl">Path login</label><input name="esppt_login_path" value="{{ s.esppt_login_path }}"></div>
+      <div><label class="lbl">Path cek tagihan</label><input name="esppt_tagihan_path" value="{{ s.esppt_tagihan_path }}"></div>
+      <div><label class="lbl">Path realisasi</label><input name="esppt_realisasi_path" value="{{ s.esppt_realisasi_path }}"></div>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <div class="lebar"><label class="lbl">Parameter permintaan realisasi (JSON)</label>
+        <textarea name="esppt_realisasi_params" style="min-height:3.6rem">{{ s.esppt_realisasi_params }}</textarea>
+        <div class="help">Placeholder tersedia: <code>{tahun}</code> <code>{dari}</code> <code>{sampai}</code> <code>{page}</code> <code>{user}</code>.
+          Isi dengan <code>{}</code> bila endpoint menerima GET tanpa parameter.</div></div>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <div class="lebar"><label class="lbl">Regex pemenggal data JSON/HTML (opsional)</label>
+        <input name="esppt_realisasi_regex" value="{{ s.esppt_realisasi_regex }}"></div>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <div class="lebar"><label class="lbl">Template permintaan realisasi (opsional, lebih ampuh)</label>
+        <textarea name="esppt_realisasi_template" style="min-height:5rem"
+          placeholder="curl 'https://esppt.nganjukkab.go.id/...' -H 'X-Requested-With: XMLHttpRequest' --data 'draw=2&start=0&length=2000&tahun={tahun}'">{{ s.esppt_realisasi_template }}</textarea>
+        <div class="help">Bila tombol unduh di halaman realisasi berupa permintaan AJAX (DataTables),
+          DevTools &gt; Network &gt; klik request &gt; <b>Copy as cURL</b> &gt; tempel di sini, lalu ganti angka tahun
+          dengan <code>{tahun}</code>. Bila terisi, path + parameter di atas diabaikan.</div></div>
+    </div>
+    <div class="row" style="margin-top:.6rem">
+      <label class="check"><input type="checkbox" name="esppt_verify_ssl" value="1" {{ 'checked' if s.esppt_verify_ssl=='1' }}>
+        verifikasi sertifikat SSL (matikan bila server eSPPT memakai sertifikat self-signed)</label>
+      <label class="check"><input type="checkbox" name="skip_billing" value="1" {{ 'checked' if s.skip_billing=='1' }}>
+        rekaman petugas langsung dianggap terverifikasi (tanpa billing) — hanya untuk kondisi darurat/offline</label>
+      <label class="check"><input type="checkbox" name="auto_lunas_bayar_sendiri" value="1" {{ 'checked' if s.auto_lunas_bayar_sendiri=='1' }}>
+        WP bayar sendiri (metode bank/pos/transfer) langsung dianggap lunas tanpa menunggu realisasi</label>
+    </div>
+    <div style="margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap">
+      <button class="btn">Simpan</button>
+    </div>
+  </form>
+
+  <div class="grid" style="gap:.9rem;align-content:start">
+    <div class="card">
+      <h2>Buat billing otomatis</h2>
+      <p class="help">eSPPT tidak menyediakan API publik, jadi “resep” request diambil dari browser Anda sekali saja:
+        buka eSPPT &gt; F12 &gt; tab <b>Network</b> &gt; klik tombol buat billing untuk 1 NOP &gt;
+        klik kanan request tersebut &gt; <b>Copy &gt; Copy as cURL</b> &gt; tempel di bawah.
+        Ganti nilai NOP/Tahun dengan placeholder. <b>Uji dulu dengan dry-run.</b></p>
+      <form method="post" action="{{ url_for('app.pengaturan') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input type="hidden" name="grup" value="esppt">
+        <label class="lbl">Template request billing (cURL atau URL+method)</label>
+        <textarea name="esppt_billing_template" placeholder="curl 'https://esppt.nganjukkab.go.id/...' -X POST -H 'Content-Type: application/x-www-form-urlencoded' --data 'nop={nop}&tahun={tahun}'"
+                  style="min-height:8rem">{{ s.esppt_billing_template }}</textarea>
+        <label class="lbl" style="margin-top:.5rem">Regex pengambil kode billing</label>
+        <input name="esppt_billing_regex" value="{{ s.esppt_billing_regex }}">
+        <div class="help">Placeholder yang tersedia: <code>{nop}</code> <code>{nop_no_dot}</code> <code>{tahun}</code>
+          <code>{denda}</code> <code>{user}</code>. Regex wajib punya grup penangkap atau mencocokkan angkanya.</div>
+        <div style="margin-top:.6rem"><button class="btn">Simpan template</button></div>
+      </form>
+      <div class="note warn" style="margin-top:.6rem"><b>Batasan yang jujur:</b> membuat billing = menulis data ke
+        sistem kabupaten. Saya tidak bisa login ke eSPPT dari sini, jadi templat di atas belum teruji terhadap
+        form asli. Kalau regex/field-nya meleset, fitur ini hanya gagal (tidak merusak data Anda), dan Anda tetap
+        bisa menempel kode billing manual di menu Antrean Billing.</div>
+    </div>
+
+    <form class="card" method="post" action="{{ url_for('app.pengaturan_uji') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <h2>Uji koneksi</h2>
+      <div class="row">
+        <div><label class="lbl">Langkah yang diuji</label>
+          <select name="langkah">
+            <option value="semua">semua (koneksi + login + realisasi + billing simulasi)</option>
+            <option value="koneksi">koneksi saja</option>
+            <option value="login">koneksi + login</option>
+            <option value="realisasi">koneksi + tarik realisasi</option>
+          </select></div>
+        <div class="sempit" style="flex:0 0 130px"><button class="btn" style="width:100%">Jalankan</button></div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card pad0" style="margin-top:.9rem">
+  <div class="head"><h2>Log aktivitas eSPPT</h2><span class="help">25 permintaan terakhir</span></div>
+  <table>
+    <thead><tr><th>Waktu</th><th>Aksi</th><th>NOP/transaksi</th><th class="num">HTTP</th><th>Status</th><th>Isi respons</th></tr></thead>
+    <tbody>
+    {% for l in log %}
+      <tr><td style="white-space:nowrap">{{ l.created_at }}</td><td>{{ l.aksi }}</td>
+        <td>{{ l.pembayaran_id or '—' }}</td><td class="num">{{ l.http_status or '—' }}</td>
+        <td>{% if l.ok %}<span class="badge ok">ok</span>{% else %}<span class="badge bad">gagal</span>{% endif %}</td>
+        <td class="help"><code style="font-size:.68rem">{{ (l.resp or '')[:200] }}</code></td></tr>
+    {% else %}
+      <tr><td colspan="6" class="kosong">Belum ada aktivitas otomasi eSPPT.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="grid g2" style="margin-top:.9rem">
+  <div class="card">
+    <h2>Basis data</h2>
+    <p class="help">Satu file SQLite: <code>{{ db_path }}</code> · besar {{ (size/1024)|round(1) }} KB.
+      Backup harian otomatis tersimpan di <code>data/backup/</code> (maks. 60 file terakhir).</p>
+    <div class="row">
+      <form method="post" action="{{ url_for('app.cadangkan') }}"><input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button class="btn2">Buat cadangan sekarang</button></form>
+    </div>
+    <div style="margin-top:.5rem">
+      {% set cps = (db_path and 1) %}
+      <div class="help">Unduh cadangan:</div>
+      <ul class="bantuan">
+        {% for f in cadangan %}<li><a href="{{ url_for('app.unduh_cadangan', nama=f.name) }}">{{ f.name }}</a> ·
+          {{ (f.stat_size/1024)|round(1) }} KB</li>{% endfor %}
+        {% if not cadangan %}<li>belum ada</li>{% endif %}
+      </ul>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Folder jemput otomatis</h2>
+    <p class="help">Taruh file unduhan eSPPT (realisasi) atau file ketetapan ke folder
+      <code>{{ folder_auto }}</code> — tanpa membuka aplikasi, file akan diproses sendiri
+      paling lama 15 menit kemudian (nama file mengandung “ketetapan/tagihan/sppt” diperlakukan
+      sebagai ketetapan, selain itu sebagai realisasi). File yang sudah dibaca dipindah ke
+      subfolder <code>sudah-diproses</code>.</p>
+    <form method="post" action="{{ url_for('app.pengaturan') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="grup" value="umum">
+      <label class="check"><input type="checkbox" name="auto_folder" value="1" {{ 'checked' if s.auto_folder=='1' }}>
+        aktifkan pemeriksaan folder (tiap 6 jam)</label>
+      <div class="row" style="margin-top:.5rem">
+        <div><label class="lbl">Token untuk pemicu luar (opsional)</label>
+          <input name="auto_token" value="{{ s.auto_token }}" placeholder="mis. abc123 — lalu panggil /data/auto/berkala?token=abc123"></div>
+      </div>
+      <div style="margin-top:.5rem"><button class="btn2">Simpan</button></div>
+    </form>
+    <div class="row" style="margin-top:.5rem">
+      <form method="post" action="{{ url_for('app.data_auto') }}"><input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button class="btn2">Proses sekarang ({{ jumlah_auto }} berkas menunggu)</button></form>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Bila data contoh ikut terkirim</h2>
+    <p class="help">Menu ini membuang transaksi/realisasi contoh tanpa menghapus ketetapan.</p>
+    <form method="post" action="{{ url_for('app.buang_percobaan') }}"
+          onsubmit="return confirm('Buang SEMUA transaksi & data realisasi? Data ketetapan NOP tetap aman.')">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <button class="btn2" style="color:var(--bad)">Buang data pembayaran contoh</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

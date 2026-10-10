@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set aktif = 'cek' %}
+{% block judul %}Cek Kwitansi{% endblock %}
+{% block isi %}
+<div class="card" style="max-width:640px;margin:1rem auto">
+  <h1>Cek keaslian kwitansi PBB-P2</h1>
+  <p class="help">Wajib pajak atau siapa pun bisa memastikan kwitansi benar-benar diterbitkan petugas.
+    Masukkan <b>nomor kwitansi</b> (mis. <code>09/{{ today.year }}/012</code>) atau
+    <b>kode verifikasi</b> yang tercetak di bagian bawah kwitansi (mis. <code>PBB-1234</code>).</p>
+  <form class="row" method="get" action="{{ url_for('app.cek_kwitansi_publik', kode='') }}"
+        style="align-items:end;margin-bottom:.7rem">
+    <div style="flex:2"><label class="lbl">Nomor kwitansi / kode verifikasi</label>
+      <input name="nomor" value="{{ q }}" placeholder="09/{{ today.year }}/012" autofocus></div>
+    <div style="flex:0 0 auto"><button class="btn" type="submit">Cek</button></div>
+  </form>
+  {% if q and not ok %}
+  <div class="note bad">Nomor/kode <code>{{ q }}</code> tidak ditemukan di catatan loket.
+    Bawa kwitansi aslinya ke kantor kelurahan untuk dicek ulang (mungkin belum dicatat petugas).</div>
+  {% endif %}
+  {% if ok %}
+  <div class="note" style="background:#e9f7ef;border-color:#bfe6cd">
+    ✔ <b>Kwitansi sah dan tercatat</b> pada aplikasi loket {{ s.wilayah_desa }}.</div>
+  <table>
+    <tr><th>Nomor kwitansi</th><td><b>{{ d.nomor }}</b></td></tr>
+    <tr><th>Tanggal</th><td>{{ d.tgl_cetak }}</td></tr>
+    <tr><th>Wajib pajak</th><td>{{ d.nama_wp }}</td></tr>
+    <tr><th>NOP</th><td class="nop">{{ d.nop }}</td></tr>
+    <tr><th>Tahun pajak</th><td>{{ d.tahun }}</td></tr>
+    <tr><th>Jumlah diterima</th><td><b>{{ d.jumlah }}</b> <span class="help">({{ d.terbilang }})</span></td></tr>
+    <tr><th>Petugas pencatat</th><td>{{ d.petugas_nama }}{% if d.blok %} — Blok {{ d.blok }}{% endif %}</td></tr>
+    <tr><th>Status setoran</th><td>
+      {% if row.status == 'terverifikasi' %}<span class="badge ok">sudah lunas di eSPPT</span>
+      {% else %}<span class="badge warn">belum lunas — masih dalam proses setor</span>{% endif %}</td></tr>
+    <tr><th>Kode verifikasi</th><td><code>{{ d.cek_kode }}</code></td></tr>
+  </table>
+  {% endif %}
+  <p class="help" style="margin-top:.7rem">{{ s.wilayah_desa }} · {{ s.wilayah_kecamatan }} ·
+    {{ s.wilayah_kabupaten }} · data dicek langsung dari buku kas aplikasi ini.</p>
+</div>
+{% endblock %}

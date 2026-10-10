@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set aktif = 'laporan' %}
+{% block judul %}Setoran ke Kas{% endblock %}
+{% block isi %}
+<h1>Uang di tangan petugas &mdash; siap disetor</h1>
+<div class="help" style="margin-bottom:.7rem">Kwitansi tahun {{ tahun }} yang uangnya sudah diterima tetapi
+  <b>belum</b> tercatat lunas di realisasi eSPPT. Ini yang harus segera dibuatkan billing / disetorkan.</div>
+
+<div class="grid g3" style="margin-bottom:.9rem">
+  <div class="stat"><div class="lbl">Jumlah kwitansi</div><div class="val">{{ rows|length }}</div>
+    <div class="sub">dari semua blok</div></div>
+  <div class="stat"><div class="lbl">Nilai di tangan</div><div class="val" style="color:var(--warn)">{{ total|rp }}</div></div>
+  <div class="stat"><div class="lbl">Blok terbanyak</div>
+    <div class="val" style="font-size:1rem">{{ per[0].blok if per else '-' }}</div>
+    <div class="sub">{{ per[0].n if per else 0 }} kwitansi · {{ (per[0].rp if per else 0)|rp }}</div></div>
+</div>
+
+<div class="card pad0" style="margin-bottom:.9rem">
+  <div class="head"><h2>Per blok</h2></div>
+  <table><thead><tr><th>Blok</th><th class="num">Kwitansi</th><th class="num">Nilai</th></tr></thead>
+    <tbody>{% for p in per %}
+      <tr><td><b>{{ p.blok }}</b></td><td class="num">{{ p.n }}</td><td class="num">{{ p.rp|rp }}</td></tr>
+    {% else %}<tr><td colspan="3" class="kosong">Tidak ada setoran tertahan. ✔</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><td>TOTAL</td><td class="num">{{ rows|length }}</td><td class="num">{{ total|rp }}</td></tr></tfoot></table>
+</div>
+
+<div class="card pad0">
+  <div class="head"><h2>Rincian</h2>
+    <a class="btn2 kecil" href="{{ url_for('app.laporan_xlsx', tahun=tahun) }}">unduh rekap progres</a></div>
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr><th>Kwitansi</th><th>Tanggal terima</th><th>Blok</th><th>NOP</th><th>WP</th>
+        <th class="num">Jumlah</th><th>Status</th><th>Billing</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr><td>{{ r.nomor_kwitansi }}</td><td>{{ r.tgl_bayar|tgl }}</td><td>{{ r.blok or '—' }}</td>
+          <td class="nop">{{ r.nop }}</td><td>{{ r.nama_wp }}</td><td class="num">{{ r.jumlah_diterima|rp }}</td>
+          <td><span class="badge {{ status_kelas(r.status) }}">{{ status_label(r.status) }}</span></td>
+          <td class="nop">{{ r.billing_code or '—' }}</td></tr>
+      {% else %}
+        <tr><td colspan="8" class="kosong">Semua setoran sudah masuk ke eSPPT.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

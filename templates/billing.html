@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% set aktif = 'billing' %}
+{% block judul %}Antrean Billing{% endblock %}
+{% block isi %}
+<h1>Antrean billing eSPPT</h1>
+<div class="help" style="margin-bottom:.7rem">
+  NOP yang <b>uangnya sudah Anda terima</b> tapi kodenya belum ada / belum lunas di eSPPT.
+  Tahun pajak <b>{{ tahun }}</b> · {{ rows|length }} NOP menunggu.</div>
+
+{% if not s.esppt_enabled or s.esppt_billing_dry_run == '1' %}
+<div class="note warn" style="margin-bottom:.8rem">
+  <b>Otomatisasi penuh belum aktif.</b>
+  Saat ini status <i>{{ 'mode simulasi (dry-run)' if s.esppt_billing_dry_run == '1' else 'mati' }}</i>.
+  Anda tetap bisa bekerja: centang NOP → pakai tombol <b>Buka eSPPT</b> (halaman cek tagihan langsung terisi NOP),
+  buat billing seperti biasa, lalu <b>tempel</b> daftar kodenya di kotak bawah — beres, tanpa salah ketik.
+  <a href="{{ url_for('app.pengaturan', tab='esppt') }}">Atur otomatis penuh di sini</a>.
+</div>
+{% endif %}
+
+<div class="grid g2" style="align-items:start">
+  <div class="card pad0">
+    <div class="head"><h2>Perlu dibuatkan billing</h2>
+      <div class="row" style="flex:0 1 auto;gap:.4rem">
+        <span class="help" id="hitung-pilih">0 dipilih</span>
+        <button class="btn2 kecil" type="button" onclick="pilihAll(true)">semua</button>
+        <button class="btn2 kecil" type="button" onclick="pilihAll(false)">kosongkan</button>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('app.billing_buat') }}" id="form-billing">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <div class="tabel-scroll">
+        <table>
+          <thead><tr><th style="width:30px"></th><th>NOP</th><th>Wajib Pajak</th><th>Blok</th>
+            <th class="num">Terutang</th><th class="num">Diterima</th><th>Tgl</th><th></th></tr></thead>
+          <tbody>
+          {% for r in rows %}
+            <tr>
+              <td><input type="checkbox" name="id" value="{{ r.id }}" onchange="hitung()"></td>
+              <td class="nop">{{ r.nop }}</td>
+              <td>{{ r.nama_wp }}</td>
+              <td>{{ r.blok or '—' }}</td>
+              <td class="num">{{ (r.pokok + (r.denda or 0))|rp }}</td>
+              <td class="num">{{ r.jumlah_diterima|rp }}</td>
+              <td>{{ r.tgl_bayar|tgl }}</td>
+              <td style="white-space:nowrap;text-align:right">
+                <a class="btn2 kecil" target="_blank"
+                   href="{{ s.esppt_base_url }}{{ s.esppt_tagihan_path }}?nop={{ r.nop_digits or r.nop }}">buka eSPPT</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="kosong">Tidak ada antrean. Semua uang yang diterima sudah ber-kode billing. ✔</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if rows %}
+      <div class="body" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+        <button class="btn" type="submit" {{ 'disabled' if not is_admin }}>Buat billing otomatis ({{ rows|length }} NOP)</button>
+        <span class="help">Butuh Pengaturan › eSPPT aktif &amp; dry-run dimatikan. Tanpa itu tombol ini hanya
+          menampilkan peringatan — data Anda tetap aman.</span>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="grid" style="gap:.9rem;align-content:start">
+    <div class="card">
+      <h2>Tempel kode billing dari eSPPT</h2>
+      <div class="help" style="margin-bottom:.4rem">Satu baris per NOP. Format bebas, yang penting NOP dan kodenya ada:
+        <br><code>35.18.010001.0001-0 ; 2812023000123456</code> · bisa juga tempel langsung dari Excel (tab).</div>
+      <form method="post" action="{{ url_for('app.billing_tempel') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <textarea name="tempel" placeholder="35.18.010001.0001-0 ; 2812023000123456&#10;35.18.010001.0002-0 ; 2812023000123999"></textarea>
+        <div style="margin-top:.5rem"><button class="btn">Simpan kode billing</button></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Sinkron sekali jalan</h2>
+      <div class="help" style="margin-bottom:.5rem">Login ke eSPPT → buat billing untuk antrean di bawah →
+        unduh data realisasi → cocokkan &amp; tandai lunas. Berjalan di latar belakang, bisa ditinggal.</div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="op-billing" checked> buat billing antrean</label>
+        <label class="check"><input type="checkbox" id="op-realisasi" checked> tarik &amp; cocokkan realisasi</label>
+      </div>
+      <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn" id="btn-sinkron" {{ 'disabled' if not is_admin }}>Jalankan sinkronisasi</button>
+        <a class="btn2" href="{{ url_for('app.pengaturan', tab='esppt') }}">pengaturan</a>
+      </div>
+      <div id="sinkron-kotak" style="margin-top:.6rem"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card pad0" style="margin-top:.9rem">
+  <div class="head"><h2>Billing terakhir dibuat</h2><span class="help">kode yang tercatat di aplikasi</span></div>
+  <table>
+    <thead><tr><th>Kwitansi</th><th>NOP</th><th>Wajib Pajak</th><th>Kode billing</th><th>Tgl billing</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for b in sudah %}
+      <tr><td>{{ b.nomor_kwitansi or '—' }}</td><td class="nop">{{ b.nop }}</td><td>{{ b.nama_wp }}</td>
+        <td class="nop"><code>{{ b.billing_code }}</code></td>
+        <td>{{ b.tgl_billing|tgl }}</td>
+        <td><span class="badge {{ status_kelas(b.status) }}">{{ status_label(b.status) }}</span></td>
+        <td style="text-align:right"><a class="btn2 kecil" href="{{ url_for('app.tagihan_detail', tag_id=b.id) }}">NOP</a></td></tr>
+    {% else %}
+      <tr><td colspan="7" class="kosong">Belum ada kode billing tercatat.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+{% block kaki %}
+<style>details summary{cursor:pointer}</style>
+<script>
+function dipilih(){return document.querySelectorAll('#form-billing input[name=id]:checked').length}
+function hitung(){var e=document.getElementById('hitung-pilih');if(e)e.textContent=dipilih()+' dipilih'}
+function pilihAll(v){document.querySelectorAll('#form-billing input[name=id]').forEach(function(x){x.checked=v});hitung()}
+var timer=null;
+function statusSinkron(){
+  fetch('{{ url_for("app.api_sinkron_status") }}').then(function(r){return r.json()}).then(function(st){
+    var kotak=document.getElementById('sinkron-kotak'); if(!kotak) return;
+    var h='';
+    if(st.berjalan) h+='<span class="badge info">berjalan</span> '+st.sudah+'/'+st.total;
+    else if(st.selesai) h+='<span class="badge ok">selesai '+st.selesai+'</span>';
+    if(st.log&&st.log.length){
+      h+='<pre style="max-height:210px;overflow:auto;background:#0d1117;color:#c9d1d9;padding:.5rem;border-radius:8px;font-size:.7rem;margin-top:.4rem">';
+      st.log.slice(-60).forEach(function(l){h+=l.t+' ['+l.level+'] '+String(l.msg).replace(/[<>&]/g,'')+'\n'});
+      h+='</pre>';
+    }
+    kotak.innerHTML=h;
+    document.getElementById('btn-sinkron').disabled = st.berjalan;
+    if(st.berjalan){timer=setTimeout(statusSinkron,2000)}else{clearTimeout(timer)}
+  }).catch(function(){});
+}
+var bs=document.getElementById('btn-sinkron');
+if(bs) bs.addEventListener('click',function(){
+  var fd=new FormData();
+  fd.append('_csrf','{{ csrf_token }}');
+  fd.append('billing',document.getElementById('op-billing').checked?'1':'0');
+  fd.append('realisasi',document.getElementById('op-realisasi').checked?'1':'0');
+  bs.disabled=true;
+  fetch('{{ url_for("app.api_sinkron_start") }}',{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(j){
+    if(!j.ok){document.getElementById('sinkron-kotak').textContent=j.pesan||'gagal';bs.disabled=false}
+    statusSinkron();
+  });
+});
+statusSinkron();
+hitung();
+</script>
+{% endblock %}

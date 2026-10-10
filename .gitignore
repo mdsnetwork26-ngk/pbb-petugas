@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+data/
+!data/.gitkeep
+tests/__pycache__/
+.pytest_cache/
+pratinjau/

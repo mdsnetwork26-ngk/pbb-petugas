@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% set aktif = 'laporan' %}
+{% block judul %}Laporan Progres{% endblock %}
+{% block isi %}
+<div class="baru">
+  <div><h1>Laporan progres pembayaran per petugas blok</h1>
+    <div class="help">Tahun pajak {{ tahun }}{% if dari %} · setoran {{ dari|tgl }} s/d {{ sampai|tgl }}{% endif %}
+      · angka “lunas” berasal dari data realisasi eSPPT, bukan dari kwitansi saja.</div></div>
+  <div class="row tanpa-cetak" style="flex:0 1 auto">
+    <a class="btn" href="{{ url_for('app.laporan_xlsx', tahun=tahun, dari=dari, sampai=sampai) }}">Ekspor Excel</a>
+    <button class="btn2" onclick="window.print()">Cetak</button>
+  </div>
+</div>
+
+<form class="card" method="get" style="margin-bottom:.9rem">
+  <div class="row">
+    <div class="sempit"><label class="lbl">Tahun pajak</label><input name="tahun" value="{{ tahun }}"></div>
+    <div><label class="lbl">Setoran dari</label><input type="date" name="dari" value="{{ dari }}"></div>
+    <div><label class="lbl">sampai</label><input type="date" name="sampai" value="{{ sampai }}"></div>
+    <div class="sempit"><button class="btn" style="width:100%">Terapkan</button></div>
+    <div class="sempit" style="flex:0 0 auto"><a class="btn2" href="{{ url_for('app.laporan', tahun=tahun) }}">Reset</a></div>
+  </div>
+</form>
+
+<div class="grid g4" style="margin-bottom:.9rem">
+  <div class="stat"><div class="lbl">SPPT ketetapan</div><div class="val">{{ tot.target_sppt|angka }}</div>
+    <div class="sub">nilai target {{ tot.target_nilai|rp }}</div></div>
+  <div class="stat"><div class="lbl">Lunas</div><div class="val" style="color:var(--ok)">{{ tot.lunas_sppt|angka }}</div>
+    <div class="sub">{{ tot.lunas_nilai|rp }} ({{ tot.persen_rp }}% nilai)</div>
+    <div class="bar"><span style="width:{{ tot.persen_sppt }}%"></span></div></div>
+  <div class="stat"><div class="lbl">Dalam proses</div><div class="val" style="color:var(--warn)">{{ tot.proses_sppt|angka }}</div>
+    <div class="sub">{{ tot.di_tangan_rp|rp }} masih di tangan petugas · kwitansi keluar {{ tot.kwitansi|angka }} lembar ({{ tot.kwitansi_rp|rp }})</div></div>
+  <div class="stat"><div class="lbl">Bayar mandiri (bank/pos)</div><div class="val">{{ tot.bayar_sendiri|angka }}</div>
+    <div class="sub">{{ tot.bayar_sendiri_rp|rp }} · lewat petugas {{ tot.via_petugas_rp|rp }}</div></div>
+</div>
+
+<div class="card pad0">
+  <div class="head"><h2>Rekap per blok — tahun {{ tahun }}</h2>
+    <span class="help">capaian = SPPT yang sudah lunas di realisasi eSPPT</span></div>
+  <table>
+    <thead><tr>
+      <th>Blok</th><th>Petugas</th><th class="num">SPPT</th><th class="num">Lunas</th><th class="num">Proses</th>
+      <th class="num">Belum</th><th style="width:14%">Capaian</th><th class="num">Target (Rp)</th>
+      <th class="num">Terealisasi</th><th class="num">Kekurangan</th><th class="num">Setoran tunai</th><th class="num">Bayar mandiri</th><th class="num">Uang di tangan</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><b>{{ r.blok }}</b></td>
+        <td>{{ r.nama }}</td>
+        <td class="num">{{ r.target_sppt|angka }}</td>
+        <td class="num" style="color:var(--ok);font-weight:700">{{ r.lunas_sppt|angka }}</td>
+        <td class="num" style="color:var(--warn)">{{ r.proses_sppt|angka }}</td>
+        <td class="num">{{ r.belum_sppt|angka }}</td>
+        <td><div class="bar"><span style="width:{{ r.persen_sppt }}%"></span></div>
+          <div class="help">{{ r.persen_sppt }}%</div></td>
+        <td class="num">{{ r.target_nilai|rp }}</td>
+        <td class="num">{{ r.lunas_nilai|rp }}</td>
+        <td class="num" style="color:var(--bad);font-weight:700">{{ r.kekurangan_nilai|rp }}</td>
+        <td class="num">{{ r.via_petugas_rp|rp }}</td>
+        <td class="num">{{ r.bayar_sendiri_rp|rp }}</td>
+        <td class="num" style="color:var(--warn);font-weight:600">{{ r.di_tangan_rp|rp }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="13" class="kosong">Belum ada data untuk tahun ini. Impor ketetapan dulu.</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if rows %}
+    <tfoot><tr><td colspan="2">TOTAL</td><td class="num">{{ tot.target_sppt|angka }}</td>
+      <td class="num">{{ tot.lunas_sppt|angka }}</td><td class="num">{{ tot.proses_sppt|angka }}</td>
+      <td class="num">{{ tot.belum_sppt|angka }}</td><td>{{ tot.persen_sppt }}%</td>
+      <td class="num">{{ tot.target_nilai|rp }}</td><td class="num">{{ tot.lunas_nilai|rp }}</td>
+      <td class="num" style="color:var(--bad);font-weight:700">{{ tot.kekurangan_nilai|rp }}</td>
+      <td class="num">{{ tot.via_petugas_rp|rp }}</td><td class="num">{{ tot.bayar_sendiri_rp|rp }}</td>
+      <td class="num">{{ tot.di_tangan_rp|rp }}</td></tr></tfoot>
+    {% endif %}
+  </table>
+</div>
+
+<div class="grid g2" style="margin-top:.9rem">
+  <div class="card pad0">
+    <div class="head"><h2>Perlu dicek: kwitansi keluar, belum lunas</h2>
+      <span class="badge {{ 'bad' if selisih else 'ok' }}">{{ selisih|length }} NOP</span></div>
+    <div class="help" style="padding:.6rem 1rem 0">Uang sudah di tangan tetapi realisasi eSPPT belum menunjukkan lunas —
+      biasnya billing belum dibayar / belum tertyetor. Ini yang biasanya bikin selisih setoran.</div>
+    <table>
+      <thead><tr><th>Kwitansi</th><th>NOP</th><th>WP</th><th>Blok</th><th class="num">Jumlah</th>
+        <th>Status</th><th>Billing</th></tr></thead>
+      <tbody>
+      {% for r in selisih %}
+        <tr><td>{{ r.nomor_kwitansi }}</td><td class="nop">{{ r.nop }}</td><td>{{ r.nama_wp }}</td>
+          <td>{{ r.blok or '—' }}</td><td class="num">{{ r.jumlah_diterima|rp }}</td>
+          <td><span class="badge {{ status_kelas(r.status) }}">{{ status_label(r.status) }}</span></td>
+          <td class="nop">{{ r.billing_code or '—' }}</td></tr>
+      {% else %}
+        <tr><td colspan="7" class="kosong">Tidak ada selisih. Semua kwitansi sudah lunas di realisasi. ✔</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card pad0">
+    <div class="head"><h2>Bayar mandiri tanpa kwitansi petugas</h2>
+      <span class="badge info">{{ tanpa|length }} baris</span></div>
+    <div class="help" style="padding:.6rem 1rem 0">Lunas di eSPPT tapi tidak terhubung ke kwitansi mana pun —
+      biasanya WP bayar langsung ke bank/pos/loket. Sudah dihitung dalam capaian bloknya.</div>
+    <div class="tabel-scroll" style="max-height:340px">
+      <table>
+        <thead><tr><th>Tanggal</th><th>NOP</th><th>Nama di eSPPT</th><th class="num">Jumlah</th>
+          <th>Channel</th><th></th></tr></thead>
+        <tbody>
+        {% for r in tanpa %}
+          <tr><td style="white-space:nowrap">{{ r.tgl_bayar|tgl }}</td>
+            <td class="nop">{% if r.tagihan_id %}<a href="{{ url_for('app.tagihan_detail', tag_id=r.tagihan_id) }}">{{ r.nop }}</a>{% else %}{{ r.nop }}{% endif %}</td>
+            <td>{{ r.nama_wp }}</td><td class="num">{{ r.jumlah|rp }}</td>
+            <td>{{ r.channel or '—' }}</td>
+            <td style="text-align:right"><span class="badge {{ 'ok' if r.matched_pembayaran_id else 'muted' }}">
+              {{ 'tercocok' if r.matched_pembayaran_id else 'mandiri' }}</span></td></tr>
+        {% else %}
+          <tr><td colspan="6" class="kosong">Tidak ada baris realisasi yang menggantung.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

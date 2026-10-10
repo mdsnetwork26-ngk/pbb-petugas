@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set aktif = 'pengaturan' %}
+{% block judul %}Hasil Uji{% endblock %}
+{% block isi %}
+<div class="baru">
+  <div><h1>Hasil uji koneksi eSPPT</h1>
+    <div class="help">langkah diuji: <b>{{ langkah }}</b> · setiap baris di bawah adalah permintaan HTTP nyata
+      yang dikirim dari komputer ini (bukan dari internet publik).</div></div>
+  <a class="btn2" href="{{ url_for('app.pengaturan', tab='esppt') }}">&larr; kembali ke pengaturan</a>
+</div>
+
+<div class="grid" style="gap:.7rem">
+  {% for h in hasil %}
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <h2 style="margin:0">{{ h.nama }}</h2>
+        {% if h.ok %}<span class="badge ok">berhasil</span>{% else %}<span class="badge bad">belum berhasil</span>{% endif %}
+      </div>
+      <div class="help" style="margin-top:.35rem">{{ h.pesan }}</div>
+      {% if h.contoh %}
+      <details style="margin-top:.4rem"><summary class="help">lihat cuplikan respons</summary>
+        <pre style="max-height:230px;overflow:auto;background:#0d1117;color:#c9d1d9;padding:.5rem;border-radius:8px;font-size:.68rem;white-space:pre-wrap">{{ h.contoh }}</pre>
+      </details>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="card"><p>Belum ada hasil uji.</p></div>
+  {% endfor %}
+</div>
+
+<div class="note warn" style="margin-top:.9rem">
+  <b>Yang biasanya perlu disesuaikan</b> (karena eSPPT tidak menyediakan API publik):
+  <ol class="bantuan" style="margin-top:.3rem">
+    <li>Path login: kalau halaman login eSPPT memakai URL lain, isikan di <code>Path login</code>.</li>
+    <li>Field form: default kami kirim <code>username</code>/<code>password</code>, lalu <code>user</code>/<code>pass</code>,
+      lalu <code>nis</code>. Bila nama field-nya beda, tempel <i>Copy as cURL</i> dari form login ke
+      <code>Template request billing</code> dan pakai <code>Path login</code> yang benar.</li>
+    <li>Data realisasi: bila unduhan tersedia sebagai URL dengan parameter (mis.
+      <code>/laporan/export?tahun=&from=&to=</code>), isi path-nya. Format apa pun yang kolomnya NOP + tahun +
+      jumlah + tanggal bisa dibaca.</li>
+    <li>Bila situs menolak (IP/akun terbatas, captcha, atau 403), jalankan aplikasi ini di komputer yang
+      biasa dipakai login — biasanya itu sudah cukup.</li>
+  </ol>
+  <div style="margin-top:.4rem">Sementara itu semua fitur pencatatan, kwitansi, dan laporan tetap berfungsi penuh
+    memakai file Excel unduhan.</div>
+</div>
+{% endblock %}

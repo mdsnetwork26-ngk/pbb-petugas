@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% set aktif = 'data' %}
+{% block judul %}Hasil pencarian{% endblock %}
+{% block isi %}
+<h1>{{ rows|length }} NOP cocok dengan “{{ q }}”</h1>
+<div class="help" style="margin-bottom:.7rem">Pilih satu baris untuk mencatat pembayaran &amp; mencetak kwitansi.</div>
+<div class="card pad0">
+  <table>
+    <thead><tr><th>NOP</th><th>Tahun</th><th>Wajib Pajak</th><th>Blok</th><th class="num">PBB</th>
+      <th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for t in rows %}
+      <tr>
+        <td class="nop"><a href="{{ url_for('app.tagihan_detail', tag_id=t.id) }}">{{ t.nop }}</a></td>
+        <td>{{ t.tahun_pajak }}</td>
+        <td><b>{{ t.nama_wp }}</b><br><span class="help">{{ t.alamat_objek }}</span></td>
+        <td>{{ t.petugas_blok or '—' }}</td>
+        <td class="num">{{ (t.pokok + t.denda)|rp }}</td>
+        <td>{% if t.status == 'lunas' %}<span class="badge ok">Lunas</span>
+            {% elif t.status == 'proses' %}<span class="badge warn">Diproses</span>
+            {% else %}<span class="badge muted">Belum bayar</span>{% endif %}</td>
+        <td style="text-align:right;white-space:nowrap">
+          {% if t.pembayaran_id %}<a class="btn2 kecil" href="{{ url_for('app.kwitansi', pid=t.pembayaran_id) }}">kwitansi</a>
+          {% else %}<a class="btn kecil" href="{{ url_for('app.bayar', tag_id=t.id) }}">Rekam bayar</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

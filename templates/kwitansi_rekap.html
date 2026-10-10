@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set aktif = 'kwitansi' %}
+{% block judul %}Cetak Ulang Kwitansi{% endblock %}
+{% block isi %}
+<h1>Cetak ulang / rekap kwitansi</h1>
+<div class="help" style="margin-bottom:.7rem">Semua kwitansi bernomor urut yang sudah diterbitkan tahun {{ tahun }}.
+  Bila WP kehilangan bukti bayar, cukup buka ulang lalu cetak — datanya tidak dibuat dua kali.</div>
+
+<form class="card" method="get" style="margin-bottom:.9rem">
+  <div class="row">
+    <div class="sempit"><label class="lbl">Tahun pajak</label><input name="tahun" value="{{ tahun }}"></div>
+    <div><label class="lbl">Dari tanggal</label><input type="date" name="dari" value="{{ arg_dari }}"></div>
+    <div><label class="lbl">sampai</label><input type="date" name="sampai" value="{{ arg_sampai }}"></div>
+    <div class="sempit" style="flex:0 0 auto"><button class="btn">Terapkan</button></div>
+    <div class="sempit" style="flex:0 0 auto"><a class="btn2" href="?tahun={{ tahun }}&format=csv">Ekspor CSV</a></div>
+  </div>
+</form>
+
+<div class="card pad0">
+  <div class="head"><h2>{{ rows|length }} kwitansi</h2><div class="num">total <b>{{ total|rp }}</b></div></div>
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr><th>Nomor</th><th>Tanggal</th><th>NOP</th><th>Wajib Pajak</th><th>Blok</th>
+        <th class="num">Jumlah</th><th class="num">Terutang</th><th>Status eSPPT</th><th>Kode billing</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><a href="{{ url_for('app.kwitansi', pid=r.id) }}"><b>{{ r.nomor_kwitansi }}</b></a></td>
+          <td style="white-space:nowrap">{{ r.tgl_bayar|tgl }}</td>
+          <td class="nop"><a href="{{ url_for('app.tagihan_detail', tag_id=r.tagihan_id) }}">{{ r.nop }}</a></td>
+          <td>{{ r.nama_wp }}<br><span class="help">{{ r.pembayar }}</span></td>
+          <td>{{ r.blok or '—' }}</td>
+          <td class="num">{{ r.jumlah_diterima|rp }}</td>
+          <td class="num help">{{ (r.pokok + r.denda)|rp }}</td>
+          <td><span class="badge {{ status_kelas(r.status) }}">{{ status_label(r.status) }}</span></td>
+          <td class="nop">{{ r.billing_code or '—' }}</td>
+          <td style="white-space:nowrap;text-align:right">
+            <a class="btn2 kecil" href="{{ url_for('app.kwitansi_pdf', pid=r.id, unduh=1) }}">PDF</a>
+            <a class="btn kecil" href="{{ url_for('app.kwitansi', pid=r.id) }}">cetak</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" class="kosong">Belum ada kwitansi untuk periode ini.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

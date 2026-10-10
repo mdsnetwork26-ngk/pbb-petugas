@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block judul %}Galat {{ code }}{% endblock %}
+{% block isi %}
+<div class="card" style="max-width:640px;margin:2rem auto;text-align:center">
+  <h1>{{ code }}</h1>
+  <p class="help" style="font-size:.95rem;color:var(--ink)">{{ pesan }}</p>
+  <div style="margin-top:.8rem;display:flex;gap:.5rem;justify-content:center">
+    <a class="btn" href="{{ url_for('app.dashboard') }}">Ke beranda</a>
+    <a class="btn2" href="javascript:history.back()">Kembali</a>
+  </div>
+  {% if code == 403 %}<p class="help" style="margin-top:.8rem">Menu Impor / Laporan / Pengaturan memang
+    khusus admin. Petugas blok cukup memakai <i>Data Ketetapan</i>, <i>Transaksi</i>, dan <i>Cetak Ulang</i>.</p>{% endif %}
+</div>
+{% endblock %}
