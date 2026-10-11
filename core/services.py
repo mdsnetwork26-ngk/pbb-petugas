@@ -150,9 +150,9 @@ def hitung_denda(pokok, tahun_pajak, s: dict, hari=None) -> int:
     jt = re.sub(r"\D", "", str(s.get("jatuh_tempo_bulan", "8") or "8"))
     jt = min(max(int(jt) if jt else 8, 1), 12)
     try:
-        persen = float(str(s.get("denda_persen", "2") or 0).replace(",", "."))
+        persen = float(str(s.get("denda_persen", "1") or 0).replace(",", "."))
     except ValueError:
-        persen = 2.0
+        persen = 1.0
     if persen <= 0:
         return 0
     maks = re.sub(r"\D", "", str(s.get("denda_maks_bulan", "24") or "24"))

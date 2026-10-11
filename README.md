@@ -29,8 +29,10 @@ Fitur tambahan (pembenahan 2026-10):
 - **Laporan per blok** — kini memuat kolom **Kekurangan (Rp)** per petugas (ikut di ekspor Excel).
 - **Denda otomatis setelah jatuh tempo** — setelah bulan jatuh tempo terlampaui (bawaan: Agustus),
   kolom **Denda** muncul di Data Ketetapan dan ikut ditagihkan (kwitansi, laporan, target blok).
-  Rumus: pokok x persen x bulan terlampaui — bawaan 2%/bulan, maks 24 bulan; diatur di
-  **Pengaturan > Denda & jatuh tempo**. Tagihan yang sudah tercatat bayar denda-nya dibekukan.
+  Rumus: pokok x persen x bulan terlampaui — bawaan **1%/bulan** (ketetapan daerah),
+  maks 24 bulan; diatur di **Pengaturan > Denda & jatuh tempo** (isi bulan jatuh tempo sesuai
+  SPPT: 7 = akhir Juli, 8 = akhir Agustus). Tagihan yang sudah tercatat bayar denda-nya
+  dibekukan — tidak bertambah lagi setelah pembayaran tercatat.
 
 Dokumen:
 - `doc/PANDUAN.md` — pemakaian sehari-hari (impor ketetapan, kwitansi, realisasi, laporan)

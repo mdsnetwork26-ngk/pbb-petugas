@@ -710,13 +710,35 @@ def test_hitung_denda_per_bulan(db_isolasi):
 
     c = conn()
     s = get_settings(c)
-    assert s["jatuh_tempo_bulan"] == "8" and s["denda_persen"] == "2" and s["denda_maks_bulan"] == "24"
+    assert s["jatuh_tempo_bulan"] == "8" and s["denda_persen"] == "1" and s["denda_maks_bulan"] == "24"
     assert S.hitung_denda(100000, "2026", s, hari=dt.date(2026, 8, 31)) == 0       # bulan jatuh tempo
-    assert S.hitung_denda(100000, "2026", s, hari=dt.date(2026, 9, 1)) == 2000    # 1 bulan
-    assert S.hitung_denda(100000, "2026", s, hari=dt.date(2026, 10, 20)) == 4000  # 2 bulan
-    assert S.hitung_denda(100000, "2024", s, hari=dt.date(2026, 10, 20)) == 48000  # mentok 24 bulan
+    assert S.hitung_denda(100000, "2026", s, hari=dt.date(2026, 9, 1)) == 1000    # 1 bulan
+    assert S.hitung_denda(100000, "2026", s, hari=dt.date(2026, 10, 20)) == 2000  # 2 bulan
+    assert S.hitung_denda(100000, "2024", s, hari=dt.date(2026, 10, 20)) == 24000  # mentok 24 bulan
     assert S.hitung_denda(100000, "2027", s, hari=dt.date(2026, 10, 20)) == 0     # tahun depan
     assert S.hitung_denda(0, "2026", s, hari=dt.date(2026, 10, 20)) == 0
+    c.close()
+
+
+def test_denda_skenario_sppt_jatuh_tempo_31_juli(db_isolasi):
+    """Skenario ketetapan daerah: SPPT 2027 jatuh tempo 31 Juli, denda 1%/bulan.
+
+    1 Agustus NOP yang belum bayar muncul denda 1%; 1 September menjadi 2%;
+    dalam bulan yang sama jumlahnya tidak bertambah; setelah dibayar denda
+    berhenti menambah (dibekukan -- diuji terpisah di test_perbarui_denda)."""
+    from core import services as S
+    from core.db import get_settings
+
+    c = conn()
+    s = get_settings(c)
+    s["jatuh_tempo_bulan"] = "7"
+    s["denda_persen"] = "1"
+    assert S.hitung_denda(500000, "2027", s, hari=dt.date(2027, 7, 31)) == 0      # hari jatuh tempo
+    assert S.hitung_denda(500000, "2027", s, hari=dt.date(2027, 8, 1)) == 5000    # 1 Agustus: 1%
+    assert S.hitung_denda(500000, "2027", s, hari=dt.date(2027, 8, 31)) == 5000   # sepanjang Agustus 1%
+    assert S.hitung_denda(500000, "2027", s, hari=dt.date(2027, 9, 1)) == 10000   # 1 September: 2%
+    assert S.hitung_denda(500000, "2027", s, hari=dt.date(2027, 9, 30)) == 10000  # sepanjang September 2%
+    assert S.hitung_denda(500000, "2027", s, hari=dt.date(2028, 7, 31)) == 60000  # 12 bulan x 1%
     c.close()
 
 
@@ -738,7 +760,7 @@ def test_perbarui_denda_beku_untuk_yang_sudah_dibayar(db_isolasi):
     d_b = c.execute("SELECT denda FROM tagihan WHERE nop='35.18.0100000.0002.001-0'").fetchone()["denda"]
     c.close()
     assert d_a == 0, "tagihan yang sudah tercatat bayar denda-nya dibekukan"
-    assert d_b == 4000 and n == 1
+    assert d_b == 2000 and n == 1      # 2 bulan terlampaui x 1%
 
 
 def test_filter_status_dan_sortir(klien, app):
@@ -786,7 +808,7 @@ def test_denda_tampil_di_daftar_dan_total(klien, app):
     d = c.execute("SELECT denda FROM tagihan LIMIT 1").fetchone()["denda"]
     tid = c.execute("SELECT id FROM tagihan LIMIT 1").fetchone()["id"]
     c.close()
-    assert d >= 24000, d                                       # min. 12 bulan x 2%
+    assert d >= 12000, d                                       # min. 12 bulan x 1%
     body = klien.get(f"/bayar/{tid}").get_data(as_text=True)
     assert "Total harus dibayar" in body and "Denda" in body   # kwitansi ikut pokok+denda
 

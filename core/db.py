@@ -173,7 +173,7 @@ DEFAULTS: dict[str, str] = {
     "catatan_kwitansi": "Simpan kwitansi ini sebagai bukti bayar yang sah.",
     # ---- denda & jatuh tempo ----
     "jatuh_tempo_bulan": "8",        # bulan jatuh tempo SPPT (8 = akhir Agustus); denda berjalan bulan berikutnya
-    "denda_persen": "2",             # persen dari pokok per bulan terlampaui
+    "denda_persen": "1",             # persen dari pokok per bulan terlampaui (ketetapan daerah: 1%)
     "denda_maks_bulan": "24",        # batas akumulasi denda (bulan)
     # ---- sinkronisasi eSPPT ----
     "esppt_enabled": "0",
@@ -216,6 +216,16 @@ def init_db(app=None) -> None:
         conn.executescript(SCHEMA)
         for k, v in DEFAULTS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
+        # migrasi sekali (2026): denda bawaan lama 2%/bulan -> 1%/bulan sesuai
+        # ketetapan daerah. Hanya berjalan sekali sepanjang umur database; nilai
+        # yang sudah sengaja diubah admin (bukan "2") tidak disentuh.
+        if not conn.execute(
+                "SELECT 1 FROM settings WHERE key='denda_persen_migrasi_1'").fetchone():
+            cur = conn.execute("SELECT value FROM settings WHERE key='denda_persen'").fetchone()
+            if cur and str(cur["value"]).strip() == "2":
+                conn.execute("UPDATE settings SET value='1' WHERE key='denda_persen'")
+            conn.execute(
+                "INSERT INTO settings(key,value) VALUES('denda_persen_migrasi_1','1')")
         _seed_if_empty(conn)
         conn.commit()
     finally:

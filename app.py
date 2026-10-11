@@ -1027,11 +1027,11 @@ def pengaturan():
             elif grup == "denda":
                 jt = re.sub(r"\D", "", request.form.get("jatuh_tempo_bulan", "8")) or "8"
                 data["jatuh_tempo_bulan"] = str(min(max(int(jt), 1), 12))
-                persen = re.sub(r"[^0-9.,]", "", request.form.get("denda_persen", "2")).replace(",", ".") or "2"
+                persen = re.sub(r"[^0-9.,]", "", request.form.get("denda_persen", "1")).replace(",", ".") or "1"
                 try:
                     data["denda_persen"] = str(float(persen))
                 except ValueError:
-                    data["denda_persen"] = "2"
+                    data["denda_persen"] = "1"
                 maks = re.sub(r"\D", "", request.form.get("denda_maks_bulan", "24")) or "24"
                 data["denda_maks_bulan"] = str(max(int(maks), 0))
             else:
