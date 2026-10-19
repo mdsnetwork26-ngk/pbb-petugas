@@ -15,28 +15,21 @@
     <small>{{ s.wilayah_desa if s else '' }}</small>
   </div>
   {% if u %}
-  <nav>
-    {% if u and u.role == 'petugas' %}
-      {# menu petugas dipangkas: fokus tagih -> pindah blok -> lihat capaian #}
-      <a href="{{ url_for('app.data_pajak') }}" class="{{ 'aktif' if aktif=='data' }}">📋 Ketetapan</a>
-      <a href="{{ url_for('app.pindah_page') }}" class="{{ 'aktif' if aktif=='pindah' }}">⇄ Pindah Blok</a>
-      <a href="{{ url_for('app.monitor') }}" class="{{ 'aktif' if aktif=='monitor' }}">📊 Papan Progres</a>
-    {% else %}
-      <a href="{{ url_for('app.dashboard') }}" class="{{ 'aktif' if aktif=='beranda' }}">Beranda</a>
-      <a href="{{ url_for('app.data_pajak') }}" class="{{ 'aktif' if aktif=='data' }}">Data Ketetapan</a>
-      <a href="{{ url_for('app.pindah_page') }}" class="{{ 'aktif' if aktif=='pindah' }}">Pindah Blok</a>
-      <a href="{{ url_for('app.transaksi') }}" class="{{ 'aktif' if aktif=='transaksi' }}">Transaksi</a>
-      <a href="{{ url_for('app.billing') }}" class="{{ 'aktif' if aktif=='billing' }}">Antrean Billing</a>
-      <a href="{{ url_for('app.laporan_kwitansi') }}" class="{{ 'aktif' if aktif=='kwitansi' }}">Cetak Ulang</a>
-      <a href="{{ url_for('app.monitor') }}" class="{{ 'aktif' if aktif=='monitor' }}">Papan Progres</a>
-      {% if is_admin %}
-        <a href="{{ url_for('app.laporan') }}" class="{{ 'aktif' if aktif=='laporan' }}">Laporan</a>
-        <a href="{{ url_for('app.impor') }}" class="{{ 'aktif' if aktif=='impor' }}">Impor Data</a>
-        <a href="{{ url_for('app.petugas_page') }}" class="{{ 'aktif' if aktif=='petugas' }}">Petugas</a>
-        <a href="{{ url_for('app.pengaturan') }}" class="{{ 'aktif' if aktif=='pengaturan' }}">Pengaturan</a>
-      {% endif %}
-    {% endif %}
-  </nav>
+  {# menu HP: tombol ☰ menampilkan semua halaman dalam satu panel (tanpa JavaScript) #}
+  <details class="menu-hp">
+    <summary>☰ Menu</summary>
+    <div class="panel-hp">
+      <div class="akun-hp"><b>{{ u.nama }}</b>
+        {{ 'Admin' if u.role=='admin' else (u.petugas.blok ~ ' — ' ~ u.petugas.nama if u.petugas else 'Petugas') }}
+      </div>
+      {% include '_menu.html' %}
+      <div class="aksi-hp">
+        <a href="{{ url_for('auth.ganti_password') }}">🔑 Ganti password</a>
+        <a href="{{ url_for('auth.logout') }}">⎋ Keluar</a>
+      </div>
+    </div>
+  </details>
+  <nav class="nav-desk">{% include '_menu.html' %}</nav>
   <div class="akun">
     <b>{{ u.nama }}</b>
     {{ 'Admin' if u.role=='admin' else (u.petugas.blok ~ ' — ' ~ u.petugas.nama if u.petugas else 'Petugas') }}

@@ -1,0 +1,21 @@
+{# Tautan menu utama — dipakai dua kali di base.html: nav desktop & panel menu HP. #}
+{% if u and u.role == 'petugas' %}
+  {# menu petugas dipangkas: fokus tagih -> pindah blok -> lihat capaian #}
+  <a href="{{ url_for('app.data_pajak') }}" class="{{ 'aktif' if aktif=='data' }}">📋 Ketetapan</a>
+  <a href="{{ url_for('app.pindah_page') }}" class="{{ 'aktif' if aktif=='pindah' }}">⇄ Pindah Blok</a>
+  <a href="{{ url_for('app.monitor') }}" class="{{ 'aktif' if aktif=='monitor' }}">📊 Papan Progres</a>
+{% else %}
+  <a href="{{ url_for('app.dashboard') }}" class="{{ 'aktif' if aktif=='beranda' }}">Beranda</a>
+  <a href="{{ url_for('app.data_pajak') }}" class="{{ 'aktif' if aktif=='data' }}">Data Ketetapan</a>
+  <a href="{{ url_for('app.pindah_page') }}" class="{{ 'aktif' if aktif=='pindah' }}">Pindah Blok</a>
+  <a href="{{ url_for('app.transaksi') }}" class="{{ 'aktif' if aktif=='transaksi' }}">Transaksi</a>
+  <a href="{{ url_for('app.billing') }}" class="{{ 'aktif' if aktif=='billing' }}">Antrean Billing</a>
+  <a href="{{ url_for('app.laporan_kwitansi') }}" class="{{ 'aktif' if aktif=='kwitansi' }}">Cetak Ulang</a>
+  <a href="{{ url_for('app.monitor') }}" class="{{ 'aktif' if aktif=='monitor' }}">Papan Progres</a>
+  {% if is_admin %}
+    <a href="{{ url_for('app.laporan') }}" class="{{ 'aktif' if aktif=='laporan' }}">Laporan</a>
+    <a href="{{ url_for('app.impor') }}" class="{{ 'aktif' if aktif=='impor' }}">Impor Data</a>
+    <a href="{{ url_for('app.petugas_page') }}" class="{{ 'aktif' if aktif=='petugas' }}">Petugas</a>
+    <a href="{{ url_for('app.pengaturan') }}" class="{{ 'aktif' if aktif=='pengaturan' }}">Pengaturan</a>
+  {% endif %}
+{% endif %}
