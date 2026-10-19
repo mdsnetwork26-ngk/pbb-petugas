@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+{% block judul %}Kasir{% endblock %}
+{% block head %}<meta name="csrf-token" content="{{ csrf_token }}">{% endblock %}
+{% block isi %}
+<div class="baru">
+  <div>
+    <h1>Mode Kasir — Bayar Banyak NOP Sekaligus</h1>
+    <div class="help">Satu pembayar bisa melunasi hingga ±20 NOP dalam satu kwitansi gabungan.
+      Tahun pajak: <b>{{ tahun }}</b>{% if scope_petugas %} · pencarian dibatasi NOP blok Anda{% endif %}.</div>
+  </div>
+  <a class="btn2 tanpa-cetak" href="{{ url_for('kasir.kasir_page') }}">Muat ulang</a>
+</div>
+
+<div class="grid g2">
+  <div class="card pad0">
+    <div class="head"><h2>1 · Cari NOP</h2>
+      <span class="help">ketik NOP / nama / alamat</span></div>
+    <div class="body">
+      <input id="q" autocomplete="off" autofocus
+             placeholder="Contoh: 35.18.0100000.0001.02-0 atau nama wajib pajak…">
+      <div class="help" id="cari-info" style="margin-top:.4rem">Hasil maksimal 50 baris. NOP yang
+        sudah lunas tetap muncul (bertanda) supaya bisa dijelaskan ke wajib pajak.</div>
+    </div>
+    <div class="tabel-scroll" style="max-height:46vh">
+      <table id="tbl-hasil">
+        <thead><tr><th>NOP</th><th>Wajib Pajak</th><th class="num">Tagihan</th><th>Status</th><th></th></tr></thead>
+        <tbody><tr><td colspan="5" class="kosong">Ketik di kotak pencarian untuk memulai.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card pad0">
+    <div class="head"><h2>2 · Keranjang Pembayaran</h2>
+      <span class="badge muted" id="jml-item">0 NOP</span></div>
+    <div class="body">
+      <div class="tabel-scroll" style="max-height:38vh">
+        <table id="tbl-keranjang">
+          <thead><tr><th>NOP</th><th>Wajib Pajak</th><th class="num">Jumlah</th><th class="kolom-hapus"></th></tr></thead>
+          <tbody><tr><td colspan="4" class="kosong">Keranjang kosong. Klik <b>Tambah</b> pada hasil pencarian.</td></tr></tbody>
+          <tfoot>
+            <tr><td colspan="2">TOTAL</td><td class="num" id="total-keranjang">Rp0</td><td></td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <div style="margin-top:.7rem">
+        <label class="lbl" for="pembayar">Telah terima dari <span style="text-transform:none;font-weight:400">
+          (nama pada kwitansi gabungan — boleh diedit)</span></label>
+        <input id="pembayar" placeholder="Otomatis terisi dari NOP pertama di keranjang">
+      </div>
+      <div style="display:flex;gap:.5rem;margin-top:.8rem">
+        <button class="btn" id="btn-bayar" disabled style="flex:1;justify-content:center">Bayar…</button>
+        <button class="btn2 merah" id="btn-kosongkan" disabled>Kosongkan</button>
+      </div>
+      <div class="flash danger" id="galat" style="display:none;margin-top:.7rem"></div>
+      <div class="flash ok" id="sukses" style="display:none;margin-top:.7rem"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card pad0" style="margin-top:.9rem">
+  <div class="head"><h2>Riwayat Transaksi Kasir</h2><span class="help">25 terakhir</span></div>
+  <div class="tabel-scroll" style="max-height:40vh">
+    <table>
+      <thead><tr><th>Nomor</th><th>Waktu</th><th class="num">NOP</th><th class="num">Total</th>
+        <th class="num">Diterima</th><th class="num">Kembalian</th><th>Mode</th><th></th></tr></thead>
+      <tbody>
+      {% for r in riwayat %}
+        <tr>
+          <td class="nop">{{ r.nomor_kwitansi }}</td>
+          <td>{{ r.created_at }}</td>
+          <td class="num">{{ r.jumlah_nop }}</td>
+          <td class="num">{{ r.total|rp }}</td>
+          <td class="num">{{ r.uang_diterima|rp if r.uang_diterima is not none else '-' }}</td>
+          <td class="num">{{ r.kembalian|rp if r.kembalian is not none else '-' }}</td>
+          <td>{% if r.mode_cetak == 'rekam_saja' %}<span class="badge muted">tanpa cetak</span>
+              {% else %}<span class="badge ok">cetak</span>{% endif %}</td>
+          <td><a class="btn2 kecil" target="_blank" rel="noopener"
+                 href="{{ url_for('kasir.kwitansi_grup_pdf', nomor=r.nomor_kwitansi) }}">PDF</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="kosong">Belum ada transaksi kasir.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================= dialog uang diterima ================= -->
+<div id="dialog" style="display:none;position:fixed;inset:0;background:rgba(10,20,30,.45);z-index:80;
+     align-items:center;justify-content:center;padding:1rem">
+  <div class="card" style="max-width:430px;width:100%">
+    <div class="head"><h2>Uang Diterima</h2>
+      <button type="button" class="btn2 kecil" id="dlg-batal">Batal</button></div>
+    <div class="body">
+      <div class="note" id="dlg-ringkas"></div>
+      <div style="margin-top:.7rem">
+        <label class="lbl" for="uang">Uang diterima dari pembayar</label>
+        <input id="uang" type="text" inputmode="numeric" autocomplete="off"
+               placeholder="isi angka, atau pakai nominal cepat di bawah">
+        <div class="row" style="margin-top:.5rem" id="chips"></div>
+        <div class="help" style="margin-top:.55rem">Kosongkan bila tidak perlu hitung kembalian
+          (mis. bayar pas sudah dihitung manual).</div>
+      </div>
+      <div class="flash info" id="kembalian-box" style="display:none;margin-top:.7rem"></div>
+      <div class="flash warn" id="uang-kurang" style="display:none;margin-top:.7rem"></div>
+      <div style="margin-top:.9rem">
+        <label class="lbl">Setelah pembayaran tercatat, apa yang dicetak?</label>
+        <label class="check"><input type="radio" name="mode" value="cetak" checked>
+          <span><b>Rekam &amp; Cetak</b> — buka kwitansi gabungan (PDF) untuk dicetak.</span></label>
+        <label class="check"><input type="radio" name="mode" value="rekam_saja">
+          <span><b>Rekam Saja (tanpa cetak kwitansi)</b> — wajib pajak membawa SPPT sendiri untuk
+            dicap lunas. PDF tetap dibuat dan tersimpan di riwayat.</span></label>
+      </div>
+      <button class="btn" id="dlg-ok" style="width:100%;justify-content:center;margin-top:.9rem">
+        Konfirmasi Pembayaran</button>
+      <div class="flash danger" id="dlg-galat" style="display:none;margin-top:.7rem"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block kaki %}
+<script>
+(function () {
+  var csrf = document.querySelector('meta[name="csrf-token"]').content;
+  var TAHUN = {{ tahun|tojson }};
+  var MAKS = {{ maks_item|tojson }};
+  var keranjang = [];
+  try { keranjang = JSON.parse(sessionStorage.getItem('kasir-keranjang') || '[]'); } catch (e) {}
+
+  function rp(n) { return 'Rp' + (n || 0).toLocaleString('id-ID'); }
+  function simpanKeranjang() {
+    try { sessionStorage.setItem('kasir-keranjang', JSON.stringify(keranjang)); } catch (e) {}
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+  function ada(id) { return keranjang.some(function (k) { return k.id === id; }); }
+
+  /* ---------- pencarian ---------- */
+  var q = document.getElementById('q'), timer = null;
+  q.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(cari, 350);
+  });
+  function cari() {
+    var v = q.value.trim();
+    var tbody = document.querySelector('#tbl-hasil tbody');
+    if (!v) { tbody.innerHTML = '<tr><td colspan="5" class="kosong">Ketik di kotak pencarian untuk memulai.</td></tr>'; return; }
+    tbody.innerHTML = '<tr><td colspan="5" class="kosong">Mencari…</td></tr>';
+    fetch('{{ url_for("kasir.api_cari") }}?q=' + encodeURIComponent(v) + '&tahun=' + TAHUN)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok || !d.hasil.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="kosong">Tidak ada NOP yang cocok.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = d.hasil.map(function (h) {
+          var lunas = h.status !== 'belum_bayar';
+          var badge = h.status === 'lunas'
+            ? '<span class="badge ok">LUNAS</span>'
+            : (h.status === 'proses' ? '<span class="badge warn">DIPROSES</span>' : '<span class="badge muted">belum bayar</span>');
+          var tombol = lunas ? '' : (ada(h.id)
+            ? '<span class="badge info">di keranjang</span>'
+            : '<button class="btn kecil" data-id="' + h.id + '">Tambah</button>');
+          return '<tr' + (lunas ? ' style="opacity:.65"' : '') + '>' +
+            '<td class="nop">' + esc(h.nop) + '<div class="help">' + esc(h.blok) + '</div></td>' +
+            '<td>' + esc(h.nama_wp) + '<div class="help">' + esc(h.alamat_objek) + '</div></td>' +
+            '<td class="num"><b>' + rp(h.total) + '</b><div class="help">denda ' + rp(h.denda) + '</div></td>' +
+            '<td>' + badge + '</td><td>' + tombol + '</td></tr>';
+        }).join('');
+        tbody.querySelectorAll('button[data-id]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var h = d.hasil.filter(function (x) { return String(x.id) === b.dataset.id; })[0];
+            if (h) tambah(h);
+          });
+        });
+      })
+      .catch(function () {
+        tbody.innerHTML = '<tr><td colspan="5" class="kosong">Gagal menghubungi server.</td></tr>';
+      });
+  }
+
+  function tambah(h) {
+    if (keranjang.length >= MAKS) { galat('Maksimal ' + MAKS + ' NOP dalam satu pembayaran.'); return; }
+    if (ada(h.id)) return;
+    keranjang.push(h);
+    if (!document.getElementById('pembayar').value.trim()) {
+      document.getElementById('pembayar').value = h.nama_wp || '';
+    }
+    gambarKeranjang(); cari();
+  }
+
+  function gambarKeranjang() {
+    var tbody = document.querySelector('#tbl-keranjang tbody');
+    if (!keranjang.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="kosong">Keranjang kosong. Klik <b>Tambah</b> pada hasil pencarian.</td></tr>';
+    } else {
+      tbody.innerHTML = keranjang.map(function (k, i) {
+        return '<tr><td class="nop">' + esc(k.nop) + '</td><td>' + esc(k.nama_wp) + '</td>' +
+          '<td class="num">' + rp(k.total) + '</td>' +
+          '<td class="kolom-hapus"><button class="btn2 kecil merah" data-i="' + i + '">✕</button></td></tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-i]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          keranjang.splice(Number(b.dataset.i), 1); gambarKeranjang(); simpanKeranjang();
+        });
+      });
+    }
+    var total = keranjang.reduce(function (a, k) { return a + (k.total || 0); }, 0);
+    document.getElementById('total-keranjang').textContent = rp(total);
+    document.getElementById('jml-item').textContent = keranjang.length + ' NOP';
+    document.getElementById('btn-bayar').disabled = !keranjang.length;
+    document.getElementById('btn-kosongkan').disabled = !keranjang.length;
+    simpanKeranjang();
+  }
+  function totalKeranjang() { return keranjang.reduce(function (a, k) { return a + (k.total || 0); }, 0); }
+
+  function galat(p) {
+    var e = document.getElementById('galat');
+    e.textContent = p; e.style.display = 'block';
+    document.getElementById('sukses').style.display = 'none';
+  }
+  function sukses(html) {
+    var e = document.getElementById('sukses');
+    e.innerHTML = html; e.style.display = 'block';
+    document.getElementById('galat').style.display = 'none';
+  }
+
+  /* ---------- dialog uang diterima ---------- */
+  var dlg = document.getElementById('dialog');
+  document.getElementById('btn-bayar').addEventListener('click', function () {
+    if (!keranjang.length) return;
+    var t = totalKeranjang();
+    document.getElementById('dlg-ringkas').innerHTML =
+      '<b>' + keranjang.length + ' NOP</b> — total tagihan <b>' + rp(t) + '</b>';
+    var chips = document.getElementById('chips');
+    var opsi = [t];
+    [50000, 100000, 200000, 500000].forEach(function (n) {
+      var b = Math.ceil(t / n) * n;
+      if (opsi.indexOf(b) === -1) opsi.push(b);
+    });
+    chips.innerHTML = opsi.slice(0, 5).map(function (n) {
+      return '<button type="button" class="btn2 kecil" data-n="' + n + '">' + rp(n) + '</button>';
+    }).join('');
+    chips.querySelectorAll('button[data-n]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.getElementById('uang').value = b.dataset.n; hitungKembalian();
+      });
+    });
+    document.getElementById('uang').value = '';
+    document.getElementById('dlg-galat').style.display = 'none';
+    hitungKembalian();
+    dlg.style.display = 'flex';
+    setTimeout(function () { document.getElementById('uang').focus(); }, 50);
+  });
+  document.getElementById('dlg-batal').addEventListener('click', function () { dlg.style.display = 'none'; });
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.style.display = 'none'; });
+
+  function angkaUang() {
+    var v = document.getElementById('uang').value.replace(/[^0-9]/g, '');
+    return v ? Number(v) : null;
+  }
+  function hitungKembalian() {
+    var u = angkaUang(), t = totalKeranjang();
+    var kb = document.getElementById('kembalian-box'), kr = document.getElementById('uang-kurang');
+    if (u === null) { kb.style.display = 'none'; kr.style.display = 'none'; return; }
+    if (u >= t) {
+      kb.innerHTML = 'Kembalian: <b>' + rp(u - t) + '</b>';
+      kb.style.display = 'block'; kr.style.display = 'none';
+    } else {
+      kr.innerHTML = 'Uang kurang <b>' + rp(t - u) + '</b> — pembayaran akan ditolak server.';
+      kb.style.display = 'none'; kr.style.display = 'block';
+    }
+  }
+  document.getElementById('uang').addEventListener('input', hitungKembalian);
+
+  document.getElementById('dlg-ok').addEventListener('click', function () {
+    var mode = document.querySelector('input[name="mode"]:checked').value;
+    var body = {
+      items: keranjang.map(function (k) { return { id: k.id }; }),
+      pembayar: document.getElementById('pembayar').value.trim(),
+      uang_diterima: angkaUang(),
+      mode_cetak: mode
+    };
+    var dg = document.getElementById('dlg-galat');
+    dg.style.display = 'none';
+    this.disabled = true;
+    fetch('{{ url_for("kasir.api_bayar") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+      .then(function (res) {
+        document.getElementById('dlg-ok').disabled = false;
+        if (!res.j.ok) { dg.textContent = res.j.pesan || 'Pembayaran ditolak.'; dg.style.display = 'block'; return; }
+        dlg.style.display = 'none';
+        var j = res.j;
+        sukses('<b>Pembayaran tercatat.</b> Kwitansi gabungan nomor <b class="nop">' + esc(j.nomor) + '</b>' +
+          ' — ' + j.jumlah_nop + ' NOP, total ' + rp(j.total) + '.' +
+          (j.kembalian !== null && j.kembalian !== undefined
+            ? '<br>Uang diterima ' + rp(j.uang_diterima) + ' → <b>kembalian ' + rp(j.kembalian) + '</b>.' : '') +
+          '<br><a class="btn kecil" style="margin-top:.5rem" target="_blank" rel="noopener" href="' + j.pdf_url +
+          '">Buka / cetak PDF kwitansi</a>' +
+          (j.mode_cetak === 'rekam_saja'
+            ? ' <span class="badge muted">rekam saja — PDF tidak dibuka otomatis</span>' : ''));
+        if (j.mode_cetak === 'cetak') { window.open(j.pdf_url, '_blank'); }
+        keranjang = [];
+        document.getElementById('pembayar').value = '';
+        gambarKeranjang();
+        setTimeout(function () { location.reload(); }, 1200);   // segarkan riwayat & status NOP
+      })
+      .catch(function () {
+        document.getElementById('dlg-ok').disabled = false;
+        dg.textContent = 'Gagal menghubungi server — coba lagi.'; dg.style.display = 'block';
+      });
+  });
+
+  document.getElementById('btn-kosongkan').addEventListener('click', function () {
+    keranjang = []; gambarKeranjang();
+  });
+
+  gambarKeranjang();
+})();
+</script>
+{% endblock %}
