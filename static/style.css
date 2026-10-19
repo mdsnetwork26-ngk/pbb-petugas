@@ -28,6 +28,11 @@ kbd{background:#fff;border:1px solid var(--line);border-bottom-width:2px}
 .topbar nav a.aktif{background:rgba(255,255,255,.22);color:#fff;font-weight:600}
 .topbar .akun{font-size:.8rem;text-align:right;line-height:1.25}
 .topbar .akun b{display:block}
+/* menu HP (details tanpa JavaScript) — tampil di layar sempit, disembunyikan di layar lebar */
+.menu-hp{display:none}
+.menu-hp>summary{list-style:none;cursor:pointer}
+.menu-hp>summary::-webkit-details-marker{display:none}
+.panel-hp{display:none}
 .wrap{max-width:1320px;margin:0 auto;padding:1rem}
 .grid{display:grid;gap:.9rem}
 .g2{grid-template-columns:1fr 1fr}
@@ -128,7 +133,6 @@ ol.bantuan li,ul.bantuan li{margin:.25rem 0}
   a{color:inherit}
 }
 @media(max-width:700px){
-  .topbar{position:static}
   td,th{padding:.4rem .45rem}
   .kolom-hapus{display:none}
 }
@@ -158,9 +162,38 @@ body.mode-petugas{font-size:16.5px}
 .kartu-aksi{display:flex;gap:.5rem}
 .kartu-aksi .btn,.kartu-aksi .btn2{flex:1;justify-content:center;font-size:1.05rem;font-weight:700}
 @media(max-width:720px){
+  /* ---- topbar: merek + tombol ☰, semua halaman ada di panel menu ---- */
+  .topbar{position:relative;flex-wrap:nowrap;gap:.5rem}
+  .topbar .merek{flex:1;min-width:0;overflow:hidden}
+  .topbar .merek small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+  .topbar nav.nav-desk,.topbar .akun{display:none}
+  .menu-hp{display:block;flex:0 0 auto;margin-left:auto}
+  .menu-hp>summary{display:inline-flex;align-items:center;gap:.35rem;background:rgba(255,255,255,.16);
+    color:#fff;padding:.5rem .85rem;border-radius:8px;font-size:.95rem;font-weight:700;white-space:nowrap}
+  .menu-hp>summary:hover{background:rgba(255,255,255,.26);text-decoration:none}
+  .menu-hp[open]>summary{background:rgba(255,255,255,.3)}
+  .menu-hp[open] .panel-hp{display:block;position:absolute;left:0;right:0;top:100%;
+    background:#fff;border-bottom:1px solid var(--line);box-shadow:0 16px 30px rgba(16,24,40,.22);
+    max-height:calc(100vh - 3.4rem);overflow-y:auto;padding:.35rem .3rem .5rem;z-index:80}
+  .panel-hp a{display:block;color:var(--ink);padding:.72rem .8rem;border-radius:9px;
+    font-size:1.02rem;font-weight:600}
+  .panel-hp a.aktif{background:#e5f2ed;color:var(--brand2)}
+  .panel-hp a:hover{background:#f1f5f9;text-decoration:none}
+  .panel-hp .akun-hp{padding:.45rem .8rem .55rem;margin-bottom:.2rem;color:var(--muted);
+    font-size:.84rem;border-bottom:1px solid var(--line);line-height:1.35}
+  .panel-hp .akun-hp b{display:block;color:var(--ink);font-size:.95rem}
+  .panel-hp .aksi-hp{border-top:1px solid var(--line);margin-top:.25rem;padding-top:.25rem}
+  .panel-hp .aksi-hp a{color:var(--bad)}
+  body.mode-petugas .menu-hp>summary{font-size:1.05rem;padding:.55rem .95rem}
+  body.mode-petugas .panel-hp a{font-size:1.12rem;padding:.8rem}
+  body.mode-petugas .panel-hp .akun-hp{font-size:.95rem}
+
+  /* ---- isi halaman: kartu yang lebarnya lebih dari layar bisa digeser, ---- */
+  /*      kolom grid boleh menyusut supaya halaman tidak melebar sendiri     */
   .kartu-daftar{display:block}
   .tabel-nop{display:none}
-  .topbar nav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .topbar nav a{white-space:nowrap}
+  .grid>*{min-width:0}
+  .card{overflow-x:auto}
+  .card.pad0>.head{position:sticky;left:0}
   .wrap{padding:.65rem}
 }
