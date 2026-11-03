@@ -632,6 +632,7 @@ def laporan_blok(conn, tahun: str, bulan: str = "", tgl_dari: str = "", tgl_samp
             "proses_sppt": 0, "belum_sppt": 0, "target_nilai": 0, "lunas_nilai": 0,
             "via_petugas": 0, "via_petugas_rp": 0, "bayar_sendiri": 0, "bayar_sendiri_rp": 0,
             "menunggak": 0, "kwitansi": 0, "kwitansi_rp": 0, "di_tangan": 0, "di_tangan_rp": 0,
+            "denda_nilai": 0, "tunggakan_nilai": 0,
         })
         tag_seen = (key, int(r["id"]))
         if tag_seen in seen_tag:
@@ -668,6 +669,18 @@ def laporan_blok(conn, tahun: str, bulan: str = "", tgl_dari: str = "", tgl_samp
         a["persen_rp"] = F.persen(a["lunas_nilai"], a["target_nilai"])
         a["proses_nilai"] = a["target_nilai"] - a["lunas_nilai"]
         a["kekurangan_nilai"] = a["proses_nilai"]
+        # denda berjalan + total tunggakan: hanya SPPT yang belum terverifikasi lunas
+        belum = conn.execute(
+            "SELECT COALESCE(SUM(t.denda),0) AS denda, "
+            "       COALESCE(SUM(t.pokok + t.denda),0) AS tunggakan "
+            "FROM tagihan t WHERE t.aktif = 1"
+            + (" AND t.tahun_pajak = ?" if tahun else "")
+            + " AND COALESCE(t.petugas_id,0) = ? AND NOT EXISTS ("
+              "SELECT 1 FROM pembayaran b WHERE b.tagihan_id = t.id AND b.void = 0 "
+              "AND b.status = 'terverifikasi')",
+            ([tahun] if tahun else []) + [key]).fetchone()
+        a["denda_nilai"] = int(belum["denda"] or 0)
+        a["tunggakan_nilai"] = int(belum["tunggakan"] or 0)
     return sorted(agg.values(), key=lambda x: (x["blok"] or "").lower())
 
 
@@ -676,7 +689,7 @@ def ringkasan(conn, tahun: str, petugas_id: int | None = None) -> dict:
     tot = {k: 0 for k in ("target_sppt", "lunas_sppt", "proses_sppt", "belum_sppt", "target_nilai",
                           "lunas_nilai", "via_petugas", "via_petugas_rp", "bayar_sendiri",
                           "bayar_sendiri_rp", "kwitansi", "kwitansi_rp", "di_tangan", "di_tangan_rp",
-                          "kekurangan_nilai")}
+                          "kekurangan_nilai", "denda_nilai", "tunggakan_nilai")}
     for r in rows:
         for k in tot:
             tot[k] += r[k]

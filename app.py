@@ -579,7 +579,8 @@ def laporan():
         tot = {k: sum(r[k] for r in rows) for k in
                ("target_sppt", "lunas_sppt", "proses_sppt", "belum_sppt", "target_nilai", "lunas_nilai",
                 "via_petugas", "via_petugas_rp", "bayar_sendiri", "bayar_sendiri_rp", "kwitansi",
-                "kwitansi_rp", "di_tangan", "di_tangan_rp", "kekurangan_nilai")}
+                "kwitansi_rp", "di_tangan", "di_tangan_rp", "kekurangan_nilai",
+                "denda_nilai", "tunggakan_nilai")}
         tot["persen_sppt"] = F.persen(tot["lunas_sppt"], tot["target_sppt"])
         tot["persen_rp"] = F.persen(tot["lunas_nilai"], tot["target_nilai"])
         selisih = S.selisih_kwitansi_vs_setoran(conn, tahun, dari, sampai)
@@ -612,21 +613,25 @@ def laporan_xlsx():
         rows = S.laporan_blok(conn, tahun, "", arg("dari"), arg("sampai"))
         data = [[r["blok"], r["nama"], r["target_sppt"], r["lunas_sppt"], r["proses_sppt"], r["belum_sppt"],
                  r["persen_sppt"], r["target_nilai"], r["lunas_nilai"], r["kekurangan_nilai"],
+                 r["denda_nilai"], r["tunggakan_nilai"],
                  r["via_petugas_rp"], r["bayar_sendiri_rp"], r["di_tangan_rp"]] for r in rows]
         tot = ["TOTAL", "", sum(r["target_sppt"] for r in rows), sum(r["lunas_sppt"] for r in rows),
                sum(r["proses_sppt"] for r in rows), sum(r["belum_sppt"] for r in rows), "",
                sum(r["target_nilai"] for r in rows), sum(r["lunas_nilai"] for r in rows),
                sum(r["kekurangan_nilai"] for r in rows),
+               sum(r["denda_nilai"] for r in rows), sum(r["tunggakan_nilai"] for r in rows),
                sum(r["via_petugas_rp"] for r in rows), sum(r["bayar_sendiri_rp"] for r in rows),
                sum(r["di_tangan_rp"] for r in rows)]
         data.append(tot)
         wb = write_table(
             ["Blok", "Nama Petugas", "Jumlah SPPT", "Lunas", "Proses", "Belum Bayar", "% SPPT",
-             "Target (Rp)", "Terealisasi (Rp)", "Kekurangan (Rp)", "Setoran Petugas (Rp)",
+             "Target (Rp, tanpa denda)", "Terealisasi (Rp)", "Kekurangan (Rp, tanpa denda)",
+             "Denda Berjalan (Rp)", "Total Tunggakan (Rp)", "Setoran Petugas (Rp)",
              "Bayar Mandiri (Rp)", "Uang Masih di Tangan (Rp)"],
             data, f"PROGRES PEMBAYARAN PBB-P2 TAHUN {tahun}",
             f"Direkap {dt.datetime.now():%d/%m/%Y %H:%M} — sumber: ketetapan + data realisasi eSPPT",
-            money_cols=[8, 9, 10, 11, 12, 13], widths=[12, 24, 11, 8, 8, 11, 9, 15, 16, 16, 16, 16, 18])
+            money_cols=[7, 8, 9, 10, 11, 12, 13, 14],
+            widths=[12, 24, 11, 8, 8, 11, 9, 16, 16, 17, 16, 17, 16, 16, 18])
         out = DATA_DIR / f"laporan-progres-{tahun}.xlsx"
         save(wb, out)
         return send_file(out, as_attachment=True, download_name=out.name,
@@ -1066,6 +1071,42 @@ def pindah_putuskan(usulan_id: int):
         conn.close()
 
 
+@bp.route("/tunggakan")
+def tunggakan():
+    """Daftar NOP menunggak (belum ada pembayaran aktif) untuk dicetak & ditagih,
+    bisa disaring per petugas blok. Denda = denda berjalan per hari ini."""
+    conn = connect()
+    try:
+        tahun = tahun_aktual()
+        S.perbarui_denda(conn)
+        pid = None if g.user["role"] == "admin" else g.user.get("petugas_id")
+        pilih = arg("petugas")
+        where = ["t.aktif = 1", "t.tahun_pajak = ?",
+                 "NOT EXISTS (SELECT 1 FROM pembayaran b WHERE b.tagihan_id = t.id AND b.void = 0)"]
+        args: list = [tahun]
+        if pid:
+            where.append("t.petugas_id = ?")
+            args.append(pid)
+            pilih = str(pid)
+        elif pilih:
+            where.append("t.petugas_id = ?")
+            args.append(pilih)
+        rows = [dict(r) for r in conn.execute(
+            S.tagihan_view_sql("WHERE " + " AND ".join(where), "p.blok, t.nop"), args)]
+        for r in rows:
+            r["total"] = (r["pokok"] or 0) + (r["denda"] or 0)
+        tot_pokok = sum(r["pokok"] or 0 for r in rows)
+        tot_denda = sum(r["denda"] or 0 for r in rows)
+        daftar = S.daftar_petugas(conn, True)
+        blok_nama = next((p["blok"] for p in daftar if str(p["id"]) == pilih), "")
+        return render_template("tunggakan.html", rows=rows, tahun=tahun, petugas=daftar,
+                               pilih=pilih, blok_nama=blok_nama, tot_pokok=tot_pokok,
+                               tot_denda=tot_denda, tot=tot_pokok + tot_denda,
+                               tahun_list=S.daftar_tahun(conn))
+    finally:
+        conn.close()
+
+
 @bp.route("/pengaturan", methods=["GET", "POST"])
 @admin_perlu
 def pengaturan():
@@ -1258,7 +1299,8 @@ def monitor():
         rows = S.laporan_blok(conn, tahun)
         tot = {k: sum(r[k] for r in rows) for k in ("target_sppt", "lunas_sppt", "proses_sppt",
                                                      "belum_sppt", "target_nilai", "lunas_nilai",
-                                                     "kekurangan_nilai")}
+                                                     "kekurangan_nilai", "denda_nilai",
+                                                     "tunggakan_nilai")}
         tot["persen_sppt"] = F.persen(tot["lunas_sppt"], tot["target_sppt"])
         return render_template("monitor.html", tahun=tahun, rows=rows, tot=tot,
                                port=request.host.split(":")[-1] if ":" in request.host else "8088")
@@ -1286,7 +1328,10 @@ def create():
     app.config.update(JSON_AS_MUTABLE=False, MAX_CONTENT_LENGTH=64 * 1024 * 1024,
                       SESSION_COOKIE_HTTPONLY=True)
     app.register_blueprint(auth_bp)
+    from core import kasir as kasir_mod      # Mode Kasir: /kasir (banyak NOP, 1 kwitansi)
+    app.register_blueprint(kasir_mod.bp)
     app.register_blueprint(bp)
+    kasir_mod.init_db_kasir()
     init_auth(app)
     init_db(app)
 
