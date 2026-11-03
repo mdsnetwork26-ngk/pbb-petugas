@@ -110,6 +110,25 @@ Excel (`.xlsx`) daftar wajib pajak yang belum membayar dengan memisahkan tiap na
 sheet yang berbeda. Menu **Setoran ke Kas** = uang yang masih ada di
 tangan petugas dan harus segera disetor.
 
+### 3.6 Mode Kasir — bayar banyak NOP sekaligus
+
+Menu **🧾 Kasir** untuk loket yang melayani satu pembayar dengan beberapa SPPT (keluarga, badan,
+atau penagih kolektif):
+
+1. ketik NOP/nama/alamat → klik **Tambah** (maksimal 30 NOP, nyaman ±20);
+2. isi **Telah terima dari** (nama pada kwitansi), lalu **Bayar…**;
+3. dialog **Uang Diterima** menghitung kembalian otomatis (boleh dikosongkan bila bayar pas);
+4. pilih **Rekam & Cetak** (PDF langsung dibuka) atau **Rekam Saja** (PDF tetap tersimpan);
+5. hasilnya **satu nomor kwitansi gabungan** — NOP pertama `MM/TAHUN/NNN`, sisanya `…/NNN.2`, `…/NNN.3`.
+   Rekap, cetak ulang, dan data eSPPT tetap berjalan seperti biasa karena tiap NOP tetap tercatat
+   sebagai pembayaran tersendiri.
+
+Semua NOP dalam satu keranjang dibayar **atomik**: bila satu NOP sudah lunas atau di luar blok,
+seluruh pembayaran dibatalkan dan keranjang perlu diperbaiki.
+
+Menu **Tunggakan** melengkapi ini: daftar NOP yang belum ada pembayaran aktif beserta denda
+berjalan, bisa disaring per petugas blok, dan punya tombol **🖨 Cetak** untuk dibawa ke lapangan.
+
 Papan **Progres** (`/monitor`) versi layar besar, menyegarkan sendiri tiap menit — cocok dibuka di
 TV kantor atau dipakai petugas memantau peringkat blok.
 
@@ -122,8 +141,11 @@ TV kantor atau dipakai petugas memantau peringkat blok.
 | Beranda (cari NOP, catatan bayar, status sinkron) | ✔ | ✔ (bloknya) |
 | Data Ketetapan | semua blok | hanya bloknya |
 | Rekam pembayaran + kwitansi | semua blok (boleh memilih penyetor) | hanya bloknya |
+| 🧾 Kasir (bayar banyak NOP, 1 kwitansi gabungan) | ✔ | buka langsung `/kasir` (bloknya) |
+| Tunggakan (daftar NOP menunggak + cetak) | semua blok | hanya bloknya |
 | Transaksi, Cetak Ulang kwitansi | ✔ | ✔ (bloknya) |
 | Antrean Billing + tempel kode | ✔ | lihat & tempel bloknya |
+| Ekspor Belum Bayar (Excel per sheet petugas) | ✔ | — |
 | Impor, Laporan, Realisasi, Petugas, Pengaturan | ✔ | — (403) |
 
 Akun: `admin/admin123` (ganti!), petugas `petugas1…petugas7/pbb123` bila memakai data contoh.

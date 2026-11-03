@@ -29,6 +29,12 @@ Fitur tambahan (pembenahan 2026-10):
 - **Laporan per blok** — kini memuat kolom **Kekurangan (Rp)** per petugas (ikut di ekspor Excel).
 - **Ekspor wajib pajak belum membayar** — menu **Ekspor Belum Bayar** mengunduh berkas Excel (`.xlsx`)
   yang otomatis memisahkan daftar wajib pajak belum membayar ke **sheet berbeda sesuai nama petugas**.
+- **Mode Kasir** — menu **🧾 Kasir**: satu pembayar melunasi beberapa NOP sekaligus (nyaman ±20),
+  dialog hitung kembalian, dan **satu kwitansi gabungan** (PDF, rincian per NOP, otomatis lanjut
+  halaman bila banyak). Pilihan *Rekam & Cetak* atau *Rekam Saja*; riwayat 25 transaksi terakhir.
+  Petugas hanya melihat NOP bloknya sendiri.
+- **Daftar Tunggakan** — menu **Tunggakan**: NOP yang belum ada pembayaran aktif, lengkap dengan
+  denda berjalan, saringan per blok, dan siap dicetak untuk ditagih.
 - **Denda otomatis setelah jatuh tempo** — setelah bulan jatuh tempo terlampaui (bawaan: Agustus),
   kolom **Denda** muncul di Data Ketetapan dan ikut ditagihkan (kwitansi, laporan, target blok).
   Rumus: pokok x persen x bulan terlampaui — bawaan **1%/bulan** (ketetapan daerah),

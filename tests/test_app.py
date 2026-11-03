@@ -528,12 +528,16 @@ def test_semua_halaman_admin_terbuka(klien, app):
                 "/laporan/progres.xlsx?tahun=2026", "/laporan/realisasi.csv?tahun=2026",
                 "/cari?nop=Wajib", "/data?cari=35.18&status=belum",
                 "/data?status=proses", "/data?petugas=1",
-                "/belum-bayar?tahun=2026", "/laporan/belum-bayar.xlsx?tahun=2026"):
+                "/belum-bayar?tahun=2026", "/laporan/belum-bayar.xlsx?tahun=2026",
+                "/kasir", "/tunggakan?tahun=2026"):
         r = klien.get(url)
         assert r.status_code == 200, f"{url} -> {r.status_code}"
         if "html" in r.mimetype:
             assert tag_seimbang(r.get_data(as_text=True)) == [], f"struktur HTML {url} rusak"
     assert klien.get("/laporan/progres.xlsx?tahun=2026").data[:2] == b"PK"
+    beranda = klien.get("/").get_data(as_text=True)
+    for teks in ("Kasir", "Tunggakan", "Ekspor Belum Bayar"):
+        assert teks in beranda, f"menu {teks} tidak muncul di beranda admin"
 
 
 def test_kwitansi_pdf_semua_metode(klien, app):
@@ -1163,3 +1167,84 @@ def test_ekspor_belum_bayar_nama_sheet_ekstrem_dan_kosong(klien, app):
     assert r_kosong.status_code == 200
     wb_kosong = load_workbook(io.BytesIO(r_kosong.data), data_only=True)
     assert wb_kosong.sheetnames == ["Belum Bayar"]
+
+def test_mode_kasir_bayar_banyak_nop_satu_kwitansi(klien, app):
+    """Mode Kasir: banyak NOP -> satu kwitansi gabungan, PDF, riwayat, dan status berubah."""
+    from core import kasir as K
+
+    masuk(klien)
+    impor(klien, KOLOM_KETETAPAN, empat_rows(), "k.xlsx")
+    assert klien.get("/kasir").status_code == 200
+
+    data = klien.get("/kasir/api/cari?q=35.18&tahun=2026").get_json()
+    assert data["ok"], data
+    assert len(data["hasil"]) >= 2, "pencarian kasir harus menemukan NOP contoh"
+    ids = [h["id"] for h in data["hasil"] if h["status"] == "belum_bayar"][:2]
+    assert len(ids) == 2, data
+
+    html = klien.get("/kasir").get_data(as_text=True)
+    csrf = re.search(r'name="csrf-token" content="([^"]+)"', html).group(1)
+    r = klien.post("/kasir/api/bayar", json={
+        "items": [{"id": i} for i in ids], "pembayar": "Pembayar Uji",
+        "uang_diterima": 500000, "mode_cetak": "rekam_saja",
+    }, headers={"X-CSRF-Token": csrf})
+    hasil = r.get_json()
+    assert r.status_code == 200 and hasil["ok"], hasil
+    assert hasil["jumlah_nop"] == 2
+    assert hasil["kembalian"] == 500000 - hasil["total"]
+
+    # satu nomor dasar + sufiks .2 -> satu kwitansi gabungan
+    c = conn()
+    nomor = c.execute("SELECT nomor_kwitansi FROM pembayaran WHERE tagihan_id=? AND void=0",
+                      (ids[0],)).fetchone()["nomor_kwitansi"]
+    baris = c.execute("SELECT nomor_kwitansi FROM pembayaran WHERE nomor_kwitansi=? "
+                      "OR nomor_kwitansi LIKE ? ORDER BY nomor_kwitansi", (nomor, nomor + ".%")).fetchall()
+    tersimpan = c.execute("SELECT COUNT(*) n FROM kasir_transaksi WHERE nomor_kwitansi=?",
+                          (nomor,)).fetchone()["n"]
+    c.close()
+    assert len(baris) == 2 and tersimpan == 1
+
+    pdf = klien.get(hasil["pdf_url"])
+    assert pdf.status_code == 200 and pdf.data[:4] == b"%PDF"
+    assert hasil["nomor"] in klien.get("/kasir").get_data(as_text=True), "riwayat kasir tidak diperbarui"
+
+    # NOP yang sudah dibayar tidak lagi berstatus 'belum_bayar'
+    after = klien.get("/kasir/api/cari?q=35.18&tahun=2026").get_json()["hasil"]
+    assert [h for h in after if h["id"] in ids and h["status"] == "belum_bayar"] == []
+
+    # keranjang kosong & NOP ganda ditolak, bukan diam-diam lolos
+    assert klien.post("/kasir/api/bayar", json={"items": []},
+                      headers={"X-CSRF-Token": csrf}).get_json()["ok"] is False
+    dobel = klien.post("/kasir/api/bayar", json={"items": [{"id": ids[0]}, {"id": ids[0]}]},
+                       headers={"X-CSRF-Token": csrf}).get_json()
+    assert dobel["ok"] is False
+
+
+def test_mode_kasir_petugas_hanya_blok_sendiri(klien, app):
+    """Petugas blok lain tidak boleh melihat/membayar NOP di luar bloknya lewat Kasir."""
+    masuk(klien)
+    # petugas dibuat DULU supaya impor memakai petugas blok yang sama (bukan membuat baru)
+    post(klien, "/petugas/simpan", nama="Kasir Blok Satu", blok="Blok 1", aktif="1",
+         buat_user="1", password="rahasia1")
+    impor(klien, KOLOM_KETETAPAN, empat_rows(), "k.xlsx")
+
+    masuk(klien, "kasir-blok-satu", "rahasia1")
+    halaman = klien.get("/kasir")
+    assert halaman.status_code == 200
+    assert "pencarian dibatasi NOP blok Anda" in halaman.get_data(as_text=True)
+
+    hasil = klien.get("/kasir/api/cari?q=35.18&tahun=2026").get_json()["hasil"]
+    assert hasil, "blok 1 seharusnya punya NOP"
+    blok = {h["blok"] for h in hasil}
+    assert blok <= {"Blok 1"}, blok
+
+    ids = [h["id"] for h in hasil if h["status"] == "belum_bayar"]
+    if ids:
+        csrf = re.search(r'name="csrf-token" content="([^"]+)"',
+                         halaman.get_data(as_text=True)).group(1)
+        j = klien.post("/kasir/api/bayar", json={"items": [{"id": ids[0]}]},
+                       headers={"X-CSRF-Token": csrf}).get_json()
+        assert j["ok"] is True, j
+
+    # daftar tunggakan juga dibatasi blok petugas
+    assert klien.get("/tunggakan?tahun=2026").status_code == 200

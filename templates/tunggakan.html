@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% set aktif = 'tunggakan' %}
+{% block judul %}Tunggakan{% endblock %}
+{% block isi %}
+<div class="baru tanpa-cetak">
+  <div><h1>Daftar tunggakan &amp; cetak tagihan</h1>
+    <div class="help">NOP yang <b>belum ada pembayaran aktif sama sekali</b> pada tahun pajak {{ tahun }}.
+      Denda = denda berjalan per hari ini (pokok × {{ s.denda_persen }}%/bulan setelah bulan jatuh tempo).</div></div>
+  <div class="row" style="flex:0 1 auto">
+    <button class="btn" onclick="window.print()">🖨 Cetak</button>
+  </div>
+</div>
+
+<form class="card tanpa-cetak" method="get" style="margin-bottom:.9rem">
+  <div class="row">
+    <div class="sempit"><label class="lbl">Tahun pajak</label>
+      <select name="tahun" style="padding:.5rem">
+        {% for t in tahun_list %}<option value="{{ t }}" {{ 'selected' if t == tahun }}>{{ t }}</option>{% endfor %}
+        <option value="{{ tahun }}" {{ 'selected' if tahun not in tahun_list }}>{{ tahun }}</option>
+      </select></div>
+    {% if u.role == 'admin' %}
+    <div><label class="lbl">Petugas blok</label>
+      <select name="petugas" style="padding:.5rem">
+        <option value="">— semua blok —</option>
+        {% for p in petugas %}<option value="{{ p.id }}" {{ 'selected' if pilih == p.id|string }}>{{ p.blok }} · {{ p.nama }}</option>{% endfor %}
+      </select></div>
+    {% endif %}
+    <div class="sempit"><button class="btn" style="width:100%">Terapkan</button></div>
+  </div>
+</form>
+
+<div class="card pad0">
+  <div style="padding:1rem 1rem .2rem;text-align:center">
+    {% if s.wilayah_kabupaten %}<div style="font-weight:700">{{ s.wilayah_kabupaten }}{% if s.wilayah_kecamatan %} — {{ s.wilayah_kecamatan }}{% endif %}</div>{% endif %}
+    {% if s.wilayah_desa %}<div>{{ s.wilayah_desa }}</div>{% endif %}
+    <h2 style="margin:.5rem 0 .2rem">DAFTAR TUNGGAKAN PBB-P2 TAHUN {{ tahun }}</h2>
+    <div class="help">Blok: <b>{{ blok_nama or 'SEMUA BLOK' }}</b> · dicetak {{ today|tglhuruf }}</div>
+  </div>
+  <table>
+    <thead><tr><th style="width:2.2rem">No</th><th>NOP</th><th>Nama Wajib Pajak</th><th>Alamat Objek</th>
+      <th class="num">Pokok (Rp)</th><th class="num">Denda (Rp)</th><th class="num">Total Tunggakan (Rp)</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="num">{{ loop.index }}</td>
+        <td class="nop">{{ r.nop }}</td>
+        <td>{{ r.nama_wp }}</td>
+        <td>{{ r.alamat_objek or '—' }}</td>
+        <td class="num">{{ r.pokok|rp }}</td>
+        <td class="num">{{ r.denda|rp }}</td>
+        <td class="num" style="font-weight:700">{{ r.total|rp }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="kosong">Tidak ada tunggakan — seluruh NOP tahun {{ tahun }}
+        {% if blok_nama %}blok {{ blok_nama }} {% endif %}sudah memiliki pembayaran. ✔</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if rows %}
+    <tfoot><tr><td colspan="4">TOTAL {{ rows|length }} NOP MENUNGGAK</td>
+      <td class="num">{{ tot_pokok|rp }}</td>
+      <td class="num">{{ tot_denda|rp }}</td>
+      <td class="num" style="font-weight:700">{{ tot|rp }}</td></tr></tfoot>
+    {% endif %}
+  </table>
+  <div class="row" style="padding:1.2rem 1rem 1.4rem;align-items:flex-end">
+    <div style="flex:1;text-align:center">
+      <div class="help">Dicetak oleh,</div>
+      <div style="height:3.4rem"></div>
+      <div style="font-weight:600">{{ u.nama }}</div>
+    </div>
+    <div style="flex:1;text-align:center">
+      <div class="help">Mengetahui,</div>
+      <div style="height:3.4rem"></div>
+      <div style="font-weight:600">{{ (blok_nama and 'Ketua Blok ' + blok_nama) or (s.nama_lurah or 'Lurah / Kepala Desa') }}</div>
+    </div>
+  </div>
+</div>
+<div class="help tanpa-cetak" style="margin-top:.6rem">Catatan: NOP yang sudah dibayar petugas namun
+belum lunas di realisasi eSPPT (status proses) <b>tidak</b> masuk daftar ini — uangnya sudah diterima;
+lihat halaman Laporan › kolom “Uang di tangan”.</div>
+{% endblock %}
