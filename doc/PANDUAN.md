@@ -105,7 +105,9 @@ Format file yang dibaca: kolom `NOP`, `TAHUN PAJAK`, `JUMLAH PEMBAYARAN` (atau `
 Menu **Laporan**: per blok ada SPPT target, lunas, dalam proses, belum bayar, % capaian (jumlah SPPT
 dan nilai rupiah), setoran tunai petugas vs bayar mandiri, dan dua daftar yang biasanya bikin
 selisih: “kwitansi keluar tapi belum lunas” serta “realisasi tanpa kwitansi petugas”.
-Tombol **Ekspor Excel** dan **Cetak** tersedia. Menu **Setoran ke Kas** = uang yang masih ada di
+Tombol **Ekspor Excel** dan **Cetak** tersedia. Menu **Ekspor Belum Bayar** menyediakan unduhan
+Excel (`.xlsx`) daftar wajib pajak yang belum membayar dengan memisahkan tiap nama petugas ke dalam
+sheet yang berbeda. Menu **Setoran ke Kas** = uang yang masih ada di
 tangan petugas dan harus segera disetor.
 
 Papan **Progres** (`/monitor`) versi layar besar, menyegarkan sendiri tiap menit — cocok dibuka di

@@ -112,7 +112,10 @@
           <a class="btn kecil" style="padding:.15rem .5rem" href="{{ url_for('app.billing') }}">Buka</a></li>
         <li style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:.35rem 0">
           <span><b>{{ ring.belum_sppt }}</b> NOP belum ada pembayaran sama sekali</span>
-          <a class="btn2 kecil" style="padding:.15rem .5rem" href="{{ url_for('app.data_pajak', status='belum', tahun=tahun) }}">Cek</a></li>
+          <span style="display:inline-flex;gap:.3rem">
+            <a class="btn2 kecil" style="padding:.15rem .5rem" href="{{ url_for('app.data_pajak', status='belum', tahun=tahun) }}">Cek</a>
+            <a class="btn2 kecil" style="padding:.15rem .5rem" href="{{ url_for('app.belum_bayar_xlsx', tahun=tahun) }}">Excel</a>
+          </span></li>
         <li style="display:flex;justify-content:space-between;padding:.35rem 0">
           <span>Laporan progres minggu ini (per blok, sudah termasuk yang bayar langsung ke bank)</span>
           <a class="btn2 kecil" style="padding:.15rem .5rem" href="{{ url_for('app.laporan', tahun=tahun) }}">Lihat</a></li>

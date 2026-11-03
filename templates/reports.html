@@ -47,6 +47,7 @@
       · angka “lunas” berasal dari data realisasi eSPPT, bukan dari kwitansi saja.</div></div>
   <div class="row tanpa-cetak" style="flex:0 1 auto">
     <a class="btn" href="{{ url_for('app.laporan_xlsx', tahun=tahun, dari=dari, sampai=sampai) }}">Ekspor Excel</a>
+    <a class="btn2" href="{{ url_for('app.belum_bayar_xlsx', tahun=tahun) }}">Ekspor WP Belum Bayar</a>
     <button class="btn2" onclick="window.print()">Cetak rekap (F4)</button>
   </div>
 </div>
