@@ -240,6 +240,41 @@ BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 HEAD_FILL = PatternFill("solid", fgColor="1F4E79")
 HEAD_FONT = Font(bold=True, color="FFFFFF", size=10)
 TITLE_FONT = Font(bold=True, size=13, color="1F4E79")
+TOTAL_FILL = PatternFill("solid", fgColor="EEF2F6")
+TOTAL_FONT = Font(bold=True, size=10, color="12202E")
+
+
+def sanitize_sheet_title(title: str, used: set[str] | None = None, suffix_hint: str = "") -> str:
+    """Bersihkan nama sheet Excel (maks. 31 karakter, bebas karakter terlarang, unik)."""
+    s = re.sub(r"[\\/*?:\[\]]+", "-", str(title or ""))
+    s = re.sub(r"[\x00-\x1f]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip(" '")
+    if not s:
+        s = "Tanpa Petugas"
+    base = s[:31].rstrip(" '") or "Petugas"
+    if used is None:
+        return base
+    if base.lower() not in used:
+        used.add(base.lower())
+        return base
+    hint = re.sub(r"[\\/*?:\[\]]+", "-", str(suffix_hint or "")).strip(" '")
+    if hint and hint.lower() not in base.lower():
+        suf = f" ({hint})"
+        if len(suf) < 28:
+            potong = s[:31 - len(suf)].rstrip(" '")
+            cand = f"{potong}{suf}"
+            if cand.lower() not in used:
+                used.add(cand.lower())
+                return cand
+    idx = 2
+    while True:
+        suf = f" ({idx})"
+        potong = s[:31 - len(suf)].rstrip(" '")
+        cand = f"{potong}{suf}"
+        if cand.lower() not in used:
+            used.add(cand.lower())
+            return cand
+        idx += 1
 
 
 def _style_header(ws, headers: list[str], title: str, subtitle: str = "") -> int:
@@ -280,6 +315,139 @@ def write_table(headers: list[str], rows: list[list], title: str, subtitle: str 
     for c in range(1, len(headers) + 1):
         w = (widths[c - 1] if widths and c - 1 < len(widths) else 16)
         ws.column_dimensions[get_column_letter(c)].width = w
+    return wb
+
+
+def write_belum_bayar_per_petugas(
+    groups: list[dict],
+    tahun: str,
+    desa: str = "",
+    termasuk_proses: bool = False,
+    dicetak: str = "",
+) -> Workbook:
+    """Buat Workbook daftar wajib pajak belum membayar, dipisah per sheet nama petugas."""
+    wb = Workbook()
+    used_titles: set[str] = set()
+    dicetak = dicetak or dt.datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    if termasuk_proses:
+        headers = [
+            "No", "NOP", "Nama Wajib Pajak", "Alamat Objek Pajak", "Alamat Wajib Pajak",
+            "Blok", "Nama Petugas", "Tahun Pajak", "Luas Bumi (m2)", "Luas Bangunan (m2)",
+            "Pokok PBB (Rp)", "Denda (Rp)", "Sudah Diterima (Rp)", "Sisa Tagihan (Rp)",
+            "Status", "Keterangan",
+        ]
+        money_cols = {11, 12, 13, 14}
+        num_cols = {9, 10}
+        center_cols = {1, 8}
+        widths = [6, 25, 25, 30, 28, 12, 22, 11, 13, 15, 15, 13, 16, 16, 16, 20]
+    else:
+        headers = [
+            "No", "NOP", "Nama Wajib Pajak", "Alamat Objek Pajak", "Alamat Wajib Pajak",
+            "Blok", "Nama Petugas", "Tahun Pajak", "Luas Bumi (m2)", "Luas Bangunan (m2)",
+            "Pokok PBB (Rp)", "Denda (Rp)", "Total Tagihan (Rp)", "Keterangan",
+        ]
+        money_cols = {11, 12, 13}
+        num_cols = {9, 10}
+        center_cols = {1, 8}
+        widths = [6, 25, 26, 32, 30, 12, 22, 11, 14, 16, 16, 14, 18, 20]
+
+    judul = (f"DAFTAR WAJIB PAJAK BELUM LUNAS PBB-P2 TAHUN {tahun}"
+             if termasuk_proses else
+             f"DAFTAR WAJIB PAJAK BELUM MEMBAYAR PBB-P2 TAHUN {tahun}")
+
+    if not groups:
+        ws = wb.active
+        ws.title = "Belum Bayar"
+        sub = f"{desa + ' · ' if desa else ''}Tidak ada wajib pajak belum membayar · Dicetak {dicetak}"
+        hr = _style_header(ws, headers, judul, sub)
+        cell = ws.cell(row=hr + 1, column=1,
+                       value="Tidak ada wajib pajak yang belum membayar untuk tahun pajak ini.")
+        cell.font = Font(italic=True, size=10, color="555555")
+        for c, w in enumerate(widths, 1):
+            ws.column_dimensions[get_column_letter(c)].width = w
+        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+        return wb
+
+    for idx, g in enumerate(groups):
+        ws = wb.active if idx == 0 else wb.create_sheet()
+        nama_petugas = g.get("nama") or "Tanpa Petugas"
+        blok = g.get("blok") or ""
+        ws.title = sanitize_sheet_title(nama_petugas, used_titles, blok if blok != "-" else "")
+
+        info_blok = f" ({blok})" if blok and blok != "-" and blok.lower() != nama_petugas.lower() else ""
+        bagian_desa = f"{desa} · " if desa else ""
+        sub = (f"{bagian_desa}Petugas: {nama_petugas}{info_blok} · "
+               f"{g['jumlah_wp']} Wajib Pajak · Total Tagihan: {F.rp(g['kurang_rp'])} · "
+               f"Dicetak {dicetak}")
+        hr = _style_header(ws, headers, judul, sub)
+
+        for no, r in enumerate(g["rows"], start=1):
+            row_idx = hr + no
+            lb_val = float(r.get("luas_bumi") or 0)
+            lbg_val = float(r.get("luas_bangunan") or 0)
+            luas_bumi = int(round(lb_val)) if lb_val.is_integer() else lb_val
+            luas_bgn = int(round(lbg_val)) if lbg_val.is_integer() else lbg_val
+            if termasuk_proses:
+                st_teks = "Dalam Proses" if r.get("status") == "proses" else "Belum Bayar"
+                values = [
+                    no, r["nop"], r["nama_wp"], r["alamat_objek"], r["alamat_wp"],
+                    blok or "-", nama_petugas, r["tahun_pajak"], luas_bumi, luas_bgn,
+                    r["pokok"], r["denda"], r["dibayar"], r["kurang"],
+                    st_teks, r.get("keterangan") or "",
+                ]
+            else:
+                values = [
+                    no, r["nop"], r["nama_wp"], r["alamat_objek"], r["alamat_wp"],
+                    blok or "-", nama_petugas, r["tahun_pajak"], luas_bumi, luas_bgn,
+                    r["pokok"], r["denda"], r["total_tagihan"], r.get("keterangan") or "",
+                ]
+            for c, v in enumerate(values, 1):
+                cell = ws.cell(row=row_idx, column=c, value=v)
+                cell.border = BORDER
+                cell.font = Font(size=10)
+                if c == 2:
+                    cell.number_format = "@"
+                    cell.alignment = Alignment(vertical="top")
+                elif c in money_cols:
+                    cell.number_format = "#,##0"
+                    cell.alignment = Alignment(horizontal="right", vertical="top")
+                elif c in num_cols:
+                    cell.number_format = "#,##0.##"
+                    cell.alignment = Alignment(horizontal="right", vertical="top")
+                elif c in center_cols:
+                    cell.alignment = Alignment(horizontal="center", vertical="top")
+                elif isinstance(v, str) and len(v) > 36:
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+                else:
+                    cell.alignment = Alignment(vertical="top")
+
+        tot_row = hr + len(g["rows"]) + 1
+        if termasuk_proses:
+            tot_values = [
+                "", "TOTAL", f"{g['jumlah_wp']} Wajib Pajak", "", "", "", "", "", "", "",
+                g["pokok_rp"], g["denda_rp"], g["dibayar_rp"], g["kurang_rp"], "", "",
+            ]
+        else:
+            tot_values = [
+                "", "TOTAL", f"{g['jumlah_wp']} Wajib Pajak", "", "", "", "", "", "", "",
+                g["pokok_rp"], g["denda_rp"], g["kurang_rp"], "",
+            ]
+        for c, v in enumerate(tot_values, 1):
+            cell = ws.cell(row=tot_row, column=c, value=v)
+            cell.border = BORDER
+            cell.fill = TOTAL_FILL
+            cell.font = TOTAL_FONT
+            if c in money_cols:
+                cell.number_format = "#,##0"
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+            else:
+                cell.alignment = Alignment(vertical="center")
+
+        for c, w in enumerate(widths, 1):
+            ws.column_dimensions[get_column_letter(c)].width = w
+        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+
     return wb
 
 

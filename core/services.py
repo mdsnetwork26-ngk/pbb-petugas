@@ -740,6 +740,122 @@ def realisasi_tanpa_kwitansi(conn, tahun: str, tgl_dari: str = "", tgl_sampai: s
     return [dict(r) for r in conn.execute(sql, args)]
 
 
+def _kunci_urut_blok(blok: str, nama: str) -> tuple:
+    """Urutkan blok secara alami ('Blok 1', 'Blok 2', ..., 'Blok 10') bebas bentrok tipe."""
+    bagian = [(0, int(tok)) if tok.isdigit() else (1, tok.lower())
+              for tok in re.split(r"(\d+)", str(blok or "")) if tok]
+    return (0, bagian, (nama or "").lower())
+
+
+def daftar_belum_bayar_per_petugas(
+    conn,
+    tahun: str,
+    sortir: str = "",
+    termasuk_proses: bool = False,
+    petugas_id: int | None = None,
+) -> list[dict]:
+    """Ambil wajib pajak aktif yang belum membayar, dikelompokkan per petugas."""
+    from .excel import sanitize_sheet_title
+
+    where = ["t.aktif = 1"]
+    args: list = []
+    if tahun:
+        where.append("t.tahun_pajak = ?")
+        args.append(tahun)
+    if petugas_id:
+        where.append("t.petugas_id = ?")
+        args.append(petugas_id)
+    if termasuk_proses:
+        where.append("NOT EXISTS (SELECT 1 FROM pembayaran b "
+                     "WHERE b.tagihan_id = t.id AND b.void = 0 AND b.status = 'terverifikasi')")
+    else:
+        where.append("NOT EXISTS (SELECT 1 FROM pembayaran b "
+                     "WHERE b.tagihan_id = t.id AND b.void = 0)")
+
+    order_map = {
+        "": "t.nop",
+        "nop": "t.nop",
+        "nama": "t.nama_wp COLLATE NOCASE, t.nop",
+        "besar": "(t.pokok + t.denda) DESC, t.nop",
+        "kecil": "(t.pokok + t.denda), t.nop",
+        "denda": "t.denda DESC, (t.pokok + t.denda) DESC, t.nop",
+        "alamat": "t.alamat_objek COLLATE NOCASE, t.nop",
+    }
+    sql = tagihan_view_sql("WHERE " + " AND ".join(where), order_map.get(sortir, "t.nop"))
+    rows = [dict(r) for r in conn.execute(sql, args)]
+
+    grouped: dict[int | None, dict] = {}
+    for r in rows:
+        pid = int(r["petugas_id"]) if r["petugas_id"] else None
+        nama = (r.get("petugas_nama") or "").strip()
+        blok = (r.get("petugas_blok") or "").strip()
+        if pid is None:
+            nama = "Tanpa Petugas"
+            blok = "-"
+        elif not nama:
+            nama = blok or f"Petugas {pid}"
+
+        pokok = int(r["pokok"] or 0)
+        denda = int(r["denda"] or 0)
+        dibayar = int(r["dibayar"] or 0)
+        total_tagihan = pokok + denda
+        kurang = max(total_tagihan - dibayar, 0)
+        st = status_tagihan(r)
+
+        item = {
+            "id": r["id"],
+            "nop": r["nop"],
+            "tahun_pajak": r["tahun_pajak"],
+            "nama_wp": r["nama_wp"] or "",
+            "alamat_objek": r["alamat_objek"] or "",
+            "alamat_wp": r["alamat_wp"] or "",
+            "luas_bumi": float(r["luas_bumi"] or 0),
+            "luas_bangunan": float(r["luas_bangunan"] or 0),
+            "pokok": pokok,
+            "denda": denda,
+            "dibayar": dibayar,
+            "total_tagihan": total_tagihan,
+            "kurang": kurang,
+            "status": st,
+            "keterangan": r["keterangan"] or "",
+            "petugas_id": pid,
+            "petugas_nama": nama,
+            "petugas_blok": blok or "-",
+        }
+
+        g = grouped.get(pid)
+        if g is None:
+            g = {
+                "petugas_id": pid,
+                "nama": nama,
+                "blok": blok or "-",
+                "sheet_nama": "",
+                "jumlah_wp": 0,
+                "pokok_rp": 0,
+                "denda_rp": 0,
+                "dibayar_rp": 0,
+                "kurang_rp": 0,
+                "rows": [],
+            }
+            grouped[pid] = g
+        g["jumlah_wp"] += 1
+        g["pokok_rp"] += pokok
+        g["denda_rp"] += denda
+        g["dibayar_rp"] += dibayar
+        g["kurang_rp"] += kurang
+        g["rows"].append(item)
+
+    hasil = sorted(
+        grouped.values(),
+        key=lambda g: (1, [], "") if g["petugas_id"] is None else _kunci_urut_blok(g["blok"], g["nama"]),
+    )
+    used_sheets: set[str] = set()
+    for g in hasil:
+        blok_hint = g["blok"] if g["blok"] != "-" else ""
+        g["sheet_nama"] = sanitize_sheet_title(g["nama"], used_sheets, blok_hint)
+    return hasil
+
+
 # --------------------------------------------------------- sinkron otomatis (bg)
 
 def mulai_sinkron(args: dict, mode: str = "full") -> bool:

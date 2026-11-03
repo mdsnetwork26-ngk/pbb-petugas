@@ -527,7 +527,8 @@ def test_semua_halaman_admin_terbuka(klien, app):
                 "/unduh/format?jenis=ketetapan", "/unduh/format?jenis=realisasi",
                 "/laporan/progres.xlsx?tahun=2026", "/laporan/realisasi.csv?tahun=2026",
                 "/cari?nop=Wajib", "/data?cari=35.18&status=belum",
-                "/data?status=proses", "/data?petugas=1"):
+                "/data?status=proses", "/data?petugas=1",
+                "/belum-bayar?tahun=2026", "/laporan/belum-bayar.xlsx?tahun=2026"):
         r = klien.get(url)
         assert r.status_code == 200, f"{url} -> {r.status_code}"
         if "html" in r.mimetype:
@@ -1016,7 +1017,149 @@ def test_menu_petugas_dan_papan_progres_rp(klien, app):
     # menu: hanya ketetapan, pindah blok, papan progres
     for menu in ("Ketetapan", "Pindah Blok", "Papan Progres"):
         assert menu in html, menu
-    for menu in ("Transaksi", "Antrean Billing", "Cetak Ulang", "Beranda", "Laporan"):
+    for menu in ("Transaksi", "Antrean Billing", "Cetak Ulang", "Beranda", "Laporan", "Ekspor Belum Bayar"):
         assert menu not in html, menu
     # papan progres tetap bisa dibuka petugas
     assert "Belum terbayar" in klien.get("/monitor?tahun=2026").get_data(as_text=True)
+
+
+def test_menu_dan_ekspor_belum_bayar_per_sheet_petugas(klien, app):
+    """Menu Ekspor Belum Bayar menghasilkan Excel dengan memisah nama petugas di sheet berbeda."""
+    from openpyxl import load_workbook
+
+    masuk(klien)
+    post(klien, "/petugas/simpan", nama="Sutrisno", blok="Blok 1", aktif="1",
+         buat_user="1", password="rahasia1")
+    post(klien, "/petugas/simpan", nama="Sri Wahyuni", blok="Blok 2", aktif="1")
+    post(klien, "/petugas/simpan", nama="Bambang Haryanto", blok="Blok 3", aktif="1")
+
+    rows = [
+        [1, "35.18.0100000.0001.01-0", "2026", "WP Sutrisno Belum 1", "Jl. A 1", "Jl. A 1", 100, 40, 30000, "Blok 1"],
+        [2, "35.18.0100000.0002.01-0", "2026", "WP Sutrisno Sudah Bayar", "Jl. A 2", "Jl. A 2", 100, 40, 35000, "Blok 1"],
+        [3, "35.18.0100000.0003.01-0", "2026", "WP Sutrisno Batal Bayar", "Jl. A 3", "Jl. A 3", 100, 40, 40000, "Blok 1"],
+        [4, "35.18.0100000.0004.01-0", "2026", "WP Sutrisno Nonaktif", "Jl. A 4", "Jl. A 4", 100, 40, 25000, "Blok 1"],
+        [5, "35.18.0100000.0005.02-0", "2026", "WP Sri Belum", "Jl. B 1", "Jl. B 1", 120, 50, 50000, "Blok 2"],
+        [6, "35.18.0100000.0006.02-0", "2026", "WP Sri Mandiri Bank", "Jl. B 2", "Jl. B 2", 120, 50, 45000, "Blok 2"],
+        [7, "35.18.0100000.0007.03-0", "2026", "WP Bambang Belum", "Jl. C 1", "Jl. C 1", 90, 36, 60000, "Blok 3"],
+        [8, "35.18.0100000.0008.04-0", "2026", "WP Lepas Petugas", "Jl. D 1", "Jl. D 1", 80, 0, 20000, ""],
+    ]
+    impor(klien, KOLOM_KETETAPAN, rows, "ketetapan.xlsx", tahun="2026")
+
+    c = conn()
+    by_nama = {r["nama_wp"]: dict(r) for r in c.execute("SELECT * FROM tagihan WHERE tahun_pajak='2026'")}
+    c.close()
+
+    # 1) WP Sutrisno Sudah Bayar -> dicatat via petugas (status menunggu_billing)
+    bayar(klien, by_nama["WP Sutrisno Sudah Bayar"]["id"], jumlah="35000", metode="petugas")
+    # 2) WP Sutrisno Batal Bayar -> dicatat lalu dibatalkan (void=1), harus kembali jadi belum bayar
+    bayar(klien, by_nama["WP Sutrisno Batal Bayar"]["id"], jumlah="40000", metode="petugas")
+    c = conn()
+    pid_batal = c.execute("SELECT id FROM pembayaran WHERE tagihan_id=?",
+                          (by_nama["WP Sutrisno Batal Bayar"]["id"],)).fetchone()["id"]
+    c.close()
+    post(klien, f"/transaksi/batal/{pid_batal}")
+    # 3) WP Sutrisno Nonaktif -> dinonaktifkan, tidak boleh ikut diekspor
+    post(klien, f"/data/nonaktif/{by_nama['WP Sutrisno Nonaktif']['id']}")
+    # 4) WP Sri Mandiri Bank -> lunas lewat impor realisasi
+    impor(klien, KOLOM_REALISASI,
+          [["1", by_nama["WP Sri Mandiri Bank"]["nop"], "WP Sri Mandiri Bank", "Jl. B 2",
+            "2026", 45000, 0, 45000, "20/08/2026"]],
+          "real.xlsx", jenis="realisasi")
+
+    # Menu tampil di navigasi admin & halaman menu terbuka dengan HTML seimbang
+    beranda_html = klien.get("/").get_data(as_text=True)
+    assert "Ekspor Belum Bayar" in beranda_html
+
+    r_page = klien.get("/belum-bayar?tahun=2026")
+    html_page = r_page.get_data(as_text=True)
+    assert r_page.status_code == 200
+    assert tag_seimbang(html_page) == []
+    for teks in ("Sutrisno", "Sri Wahyuni", "Bambang Haryanto", "Tanpa Petugas"):
+        assert teks in html_page
+
+    # Unduh file Excel: sheet terpisah sesuai nama petugas
+    r_xlsx = klien.get("/laporan/belum-bayar.xlsx?tahun=2026")
+    assert r_xlsx.status_code == 200
+    assert "spreadsheetml" in r_xlsx.mimetype
+    assert klien.get("/belum-bayar.xlsx?tahun=2026").status_code == 200
+
+    wb = load_workbook(io.BytesIO(r_xlsx.data), data_only=True)
+    assert wb.sheetnames == ["Sutrisno", "Sri Wahyuni", "Bambang Haryanto", "Tanpa Petugas"]
+
+    def isi_sheet(ws):
+        return "\n".join(
+            " | ".join(str(v) for v in row if v is not None)
+            for row in ws.iter_rows(values_only=True)
+        )
+
+    teks_sutrisno = isi_sheet(wb["Sutrisno"])
+    assert "WP Sutrisno Belum 1" in teks_sutrisno
+    assert "WP Sutrisno Batal Bayar" in teks_sutrisno
+    assert "WP Sutrisno Sudah Bayar" not in teks_sutrisno
+    assert "WP Sutrisno Nonaktif" not in teks_sutrisno
+    assert "WP Sri Belum" not in teks_sutrisno
+
+    teks_sri = isi_sheet(wb["Sri Wahyuni"])
+    assert "WP Sri Belum" in teks_sri
+    assert "WP Sri Mandiri Bank" not in teks_sri
+    assert "WP Sutrisno Belum 1" not in teks_sri
+
+    teks_bambang = isi_sheet(wb["Bambang Haryanto"])
+    assert "WP Bambang Belum" in teks_bambang
+
+    teks_tanpa = isi_sheet(wb["Tanpa Petugas"])
+    assert "WP Lepas Petugas" in teks_tanpa
+
+    # Periksa baris TOTAL di sheet Sutrisno (2 WP belum bayar: pokok 30.000 + 40.000 = 70.000)
+    baris_sutrisno = list(wb["Sutrisno"].iter_rows(values_only=True))
+    tot_row = baris_sutrisno[-1]
+    assert tot_row[1] == "TOTAL" and tot_row[2] == "2 Wajib Pajak"
+    assert tot_row[10] == 70000                       # total pokok
+    assert tot_row[12] == tot_row[10] + tot_row[11]   # total tagihan = pokok + denda
+
+    # Cakupan belum_lunas: menyertakan WP yang masih diproses (menunggu_billing), tapi bukan yang terverifikasi
+    r_bl = klien.get("/laporan/belum-bayar.xlsx?tahun=2026&cakupan=belum_lunas")
+    wb_bl = load_workbook(io.BytesIO(r_bl.data), data_only=True)
+    teks_bl_sutrisno = isi_sheet(wb_bl["Sutrisno"])
+    assert "WP Sutrisno Sudah Bayar" in teks_bl_sutrisno and "Dalam Proses" in teks_bl_sutrisno
+    assert "WP Sri Mandiri Bank" not in isi_sheet(wb_bl["Sri Wahyuni"])
+
+    # Akun petugas tidak diizinkan membuka menu/ekspor admin seluruh petugas
+    masuk(klien, "sutrisno", "rahasia1")
+    assert klien.get("/belum-bayar").status_code == 403
+    assert klien.get("/laporan/belum-bayar.xlsx").status_code == 403
+
+
+def test_ekspor_belum_bayar_nama_sheet_ekstrem_dan_kosong(klien, app):
+    """Nama petugas >31 karakter, karakter spesial Excel, atau nama kembar tetap jadi sheet valid."""
+    from openpyxl import load_workbook
+
+    masuk(klien)
+    post(klien, "/petugas/simpan",
+         nama="Drs. H. Ahmad / Fauzi: [Blok*1?] Nama Sangat Panjang Sekali",
+         blok="Blok 1", aktif="1")
+    post(klien, "/petugas/simpan", nama="Slamet", blok="Blok 2", aktif="1")
+    post(klien, "/petugas/simpan", nama="Slamet", blok="Blok 3", aktif="1")
+
+    rows = [
+        [1, "35.18.0100000.0001.01-0", "2026", "WP Satu", "Jl. 1", "Jl. 1", 100, 20, 20000, "Blok 1"],
+        [2, "35.18.0100000.0002.02-0", "2026", "WP Dua", "Jl. 2", "Jl. 2", 100, 20, 25000, "Blok 2"],
+        [3, "35.18.0100000.0003.03-0", "2026", "WP Tiga", "Jl. 3", "Jl. 3", 100, 20, 30000, "Blok 3"],
+    ]
+    impor(klien, KOLOM_KETETAPAN, rows, "k.xlsx", tahun="2026")
+
+    r = klien.get("/laporan/belum-bayar.xlsx?tahun=2026&sortir=besar")
+    assert r.status_code == 200
+    wb = load_workbook(io.BytesIO(r.data), data_only=True)
+    assert len(wb.sheetnames) == 3
+    for sname in wb.sheetnames:
+        assert 1 <= len(sname) <= 31
+        assert not re.search(r"[\\/*?:\[\]]", sname)
+    assert "Slamet" in wb.sheetnames and "Slamet (Blok 3)" in wb.sheetnames
+
+    # Tahun tanpa data belum bayar tetap menghasilkan workbook valid
+    assert tag_seimbang(klien.get("/belum-bayar?tahun=2099").get_data(as_text=True)) == []
+    r_kosong = klien.get("/laporan/belum-bayar.xlsx?tahun=2099")
+    assert r_kosong.status_code == 200
+    wb_kosong = load_workbook(io.BytesIO(r_kosong.data), data_only=True)
+    assert wb_kosong.sheetnames == ["Belum Bayar"]

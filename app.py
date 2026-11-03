@@ -31,7 +31,7 @@ from core import services as S        # noqa: E402
 from core.auth import admin_perlu, bp as auth_bp, init_app as init_auth  # noqa: E402
 from core.db import (BACKUP_DIR, DATA_AUTO_DIR, DATA_DIR, DB_PATH, UPLOAD_DIR,  # noqa: E402
                      connect, daily_backup, db_size_bytes, get_settings, init_db, set_settings)
-from core.excel import read_sheet, save, write_table          # noqa: E402
+from core.excel import read_sheet, save, write_belum_bayar_per_petugas, write_table  # noqa: E402
 from core.esppt import EspptClient                            # noqa: E402
 from core.pdf import buat_pdf, format_kwitansi                # noqa: E402
 
@@ -631,6 +631,75 @@ def laporan_xlsx():
         save(wb, out)
         return send_file(out, as_attachment=True, download_name=out.name,
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    finally:
+        conn.close()
+
+
+@bp.route("/belum-bayar")
+@admin_perlu
+def belum_bayar():
+    """Halaman menu ekspor wajib pajak yang belum membayar (dipisah per sheet petugas)."""
+    conn = connect()
+    try:
+        tahun = tahun_aktual()
+        S.perbarui_denda(conn)
+        sortir = arg("sortir")
+        cakupan = arg("cakupan")
+        termasuk_proses = cakupan == "belum_lunas"
+        groups = S.daftar_belum_bayar_per_petugas(
+            conn, tahun, sortir=sortir, termasuk_proses=termasuk_proses,
+        )
+        tot = {
+            "jumlah_wp": sum(g["jumlah_wp"] for g in groups),
+            "pokok_rp": sum(g["pokok_rp"] for g in groups),
+            "denda_rp": sum(g["denda_rp"] for g in groups),
+            "dibayar_rp": sum(g["dibayar_rp"] for g in groups),
+            "kurang_rp": sum(g["kurang_rp"] for g in groups),
+        }
+        return render_template(
+            "belum_bayar.html",
+            tahun=tahun,
+            tahun_list=S.daftar_tahun(conn),
+            groups=groups,
+            tot=tot,
+            sortir=sortir,
+            cakupan=cakupan,
+            termasuk_proses=termasuk_proses,
+        )
+    finally:
+        conn.close()
+
+
+@bp.route("/belum-bayar.xlsx")
+@bp.route("/laporan/belum-bayar.xlsx")
+@admin_perlu
+def belum_bayar_xlsx():
+    """Unduh Excel wajib pajak yang belum membayar, 1 sheet per nama petugas."""
+    conn = connect()
+    try:
+        tahun = tahun_aktual()
+        S.perbarui_denda(conn)
+        sortir = arg("sortir")
+        termasuk_proses = arg("cakupan") == "belum_lunas"
+        groups = S.daftar_belum_bayar_per_petugas(
+            conn, tahun, sortir=sortir, termasuk_proses=termasuk_proses,
+        )
+        desa = get_settings(conn).get("wilayah_desa", "")
+        wb = write_belum_bayar_per_petugas(
+            groups, tahun, desa=desa, termasuk_proses=termasuk_proses,
+        )
+        tahun_aman = re.sub(r"[^0-9]", "", tahun)[:4] or str(dt.date.today().year)
+        jenis = "belum-lunas" if termasuk_proses else "belum-bayar"
+        nama_file = f"wajib-pajak-{jenis}-{tahun_aman}.xlsx"
+        bio = io.BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+        return send_file(
+            bio,
+            as_attachment=True,
+            download_name=nama_file,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
     finally:
         conn.close()
 

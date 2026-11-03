@@ -27,6 +27,8 @@ Fitur tambahan (pembenahan 2026-10):
 - **Pindah blok wajib pajak** — petugas mengajukan (menu Pindah Blok / tombol ⇄ di baris NOP),
   admin menyetujui/menolak; NOP beserta riwayatnya pindah ke petugas blok baru begitu disetujui.
 - **Laporan per blok** — kini memuat kolom **Kekurangan (Rp)** per petugas (ikut di ekspor Excel).
+- **Ekspor wajib pajak belum membayar** — menu **Ekspor Belum Bayar** mengunduh berkas Excel (`.xlsx`)
+  yang otomatis memisahkan daftar wajib pajak belum membayar ke **sheet berbeda sesuai nama petugas**.
 - **Denda otomatis setelah jatuh tempo** — setelah bulan jatuh tempo terlampaui (bawaan: Agustus),
   kolom **Denda** muncul di Data Ketetapan dan ikut ditagihkan (kwitansi, laporan, target blok).
   Rumus: pokok x persen x bulan terlampaui — bawaan **1%/bulan** (ketetapan daerah),

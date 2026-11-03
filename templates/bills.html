@@ -72,6 +72,9 @@
   <div class="head">
     <h2>NOP tagihan</h2>
     <div class="row" style="gap:.4rem;flex:0 1 auto">
+      {% if is_admin %}
+        <a class="btn2 kecil" href="{{ url_for('app.belum_bayar_xlsx', tahun=tahun, sortir=sortir) }}">Ekspor Belum Bayar (.xlsx)</a>
+      {% endif %}
       <a class="btn2 kecil" href="{{ url_for('app.impor') }}">Impor / perbarui ketetapan</a>
     </div>
   </div>

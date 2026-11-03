@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% set aktif = 'belum_bayar' %}
+{% block judul %}Ekspor Belum Bayar{% endblock %}
+{% block isi %}
+<div class="baru tanpa-cetak">
+  <div>
+    <h1>Ekspor wajib pajak yang belum membayar</h1>
+    <div class="help">Tahun pajak {{ tahun }} · berkas Excel (.xlsx) memisahkan setiap <b>nama petugas</b>
+      ke dalam sheet (tab) yang berbeda agar siap dibagikan atau dicetak per petugas.</div>
+  </div>
+  <div class="row tanpa-cetak" style="flex:0 1 auto">
+    <a class="btn" href="{{ url_for('app.belum_bayar_xlsx', tahun=tahun, sortir=sortir, cakupan=cakupan) }}">
+      Unduh Excel per Petugas (.xlsx)
+    </a>
+  </div>
+</div>
+
+<form class="card tanpa-cetak" method="get" action="{{ url_for('app.belum_bayar') }}" style="margin-bottom:.9rem">
+  <div class="row" style="align-items:end">
+    <div class="sempit">
+      <label class="lbl">Tahun pajak</label>
+      <input name="tahun" value="{{ tahun }}" list="daftar-tahun">
+      <datalist id="daftar-tahun">
+        {% for t in tahun_list %}<option value="{{ t }}"></option>{% endfor %}
+      </datalist>
+    </div>
+    <div>
+      <label class="lbl">Cakupan wajib pajak</label>
+      <select name="cakupan">
+        <option value="" {{ 'selected' if not cakupan }}>Belum membayar sama sekali</option>
+        <option value="belum_lunas" {{ 'selected' if cakupan == 'belum_lunas' }}>Termasuk yang masih diproses (belum lunas eSPPT)</option>
+      </select>
+    </div>
+    <div>
+      <label class="lbl">Urutan baris di tiap sheet</label>
+      <select name="sortir">
+        <option value="" {{ 'selected' if not sortir or sortir == 'nop' }}>NOP (A &rarr; Z)</option>
+        <option value="nama" {{ 'selected' if sortir == 'nama' }}>Nama Wajib Pajak (A &rarr; Z)</option>
+        <option value="besar" {{ 'selected' if sortir == 'besar' }}>Tagihan terbesar</option>
+        <option value="kecil" {{ 'selected' if sortir == 'kecil' }}>Tagihan terkecil</option>
+        <option value="denda" {{ 'selected' if sortir == 'denda' }}>Denda terbesar</option>
+        <option value="alamat" {{ 'selected' if sortir == 'alamat' }}>Alamat objek pajak</option>
+      </select>
+    </div>
+    <div class="sempit" style="flex:0 0 auto">
+      <button class="btn2" type="submit">Tampilkan</button>
+    </div>
+    <div class="sempit" style="flex:0 0 auto">
+      <button class="btn" type="submit" formaction="{{ url_for('app.belum_bayar_xlsx') }}">Ekspor Excel (.xlsx)</button>
+    </div>
+    <div class="sempit" style="flex:0 0 auto">
+      <a class="btn2" href="{{ url_for('app.belum_bayar', tahun=tahun) }}">Reset</a>
+    </div>
+  </div>
+</form>
+
+<div class="grid g4 tanpa-cetak" style="margin-bottom:.9rem">
+  <div class="stat">
+    <div class="lbl">Wajib Pajak Belum Bayar</div>
+    <div class="val" style="color:var(--bad)">{{ tot.jumlah_wp|angka }}</div>
+    <div class="sub">objek pajak tahun {{ tahun }}</div>
+  </div>
+  <div class="stat">
+    <div class="lbl">Jumlah Sheet Excel</div>
+    <div class="val">{{ groups|length|angka }}</div>
+    <div class="sub">dipisah per nama petugas</div>
+  </div>
+  <div class="stat">
+    <div class="lbl">Pokok PBB</div>
+    <div class="val">{{ tot.pokok_rp|rp }}</div>
+    <div class="sub">pokok ketetapan belum lunas</div>
+  </div>
+  <div class="stat">
+    <div class="lbl">Total Tagihan</div>
+    <div class="val" style="color:var(--warn)">{{ tot.kurang_rp|rp }}</div>
+    <div class="sub">termasuk denda {{ tot.denda_rp|rp }}</div>
+  </div>
+</div>
+
+<div class="card pad0" style="margin-bottom:.9rem">
+  <div class="head">
+    <h2>Pembagian sheet per nama petugas &mdash; tahun {{ tahun }}</h2>
+    <span class="help">setiap baris di bawah ini menjadi 1 sheet tersendiri di berkas Excel</span>
+  </div>
+  <div class="tabel-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Nama Sheet (Excel)</th>
+          <th>Nama Petugas</th>
+          <th>Blok</th>
+          <th class="num">Wajib Pajak</th>
+          <th class="num">Pokok PBB</th>
+          <th class="num">Denda</th>
+          {% if termasuk_proses %}<th class="num">Sudah Diterima</th>{% endif %}
+          <th class="num">Total Tagihan</th>
+          <th class="tanpa-cetak"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for g in groups %}
+        <tr>
+          <td><code>{{ g.sheet_nama }}</code></td>
+          <td><b>{{ g.nama }}</b></td>
+          <td>{{ g.blok }}</td>
+          <td class="num"><b>{{ g.jumlah_wp|angka }}</b></td>
+          <td class="num">{{ g.pokok_rp|rp }}</td>
+          <td class="num" style="color:var(--bad)">{{ g.denda_rp|rp }}</td>
+          {% if termasuk_proses %}<td class="num">{{ g.dibayar_rp|rp }}</td>{% endif %}
+          <td class="num" style="color:var(--warn);font-weight:700">{{ g.kurang_rp|rp }}</td>
+          <td class="tanpa-cetak" style="text-align:right;white-space:nowrap">
+            {% if g.petugas_id %}
+              <a class="btn2 kecil" href="{{ url_for('app.data_pajak', tahun=tahun, petugas=g.petugas_id, status='belum') }}">Lihat NOP</a>
+            {% else %}
+              <a class="btn2 kecil" href="#petugas-tanpa">Rincian</a>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="{{ 9 if termasuk_proses else 8 }}" class="kosong">
+            Tidak ada wajib pajak yang belum membayar pada tahun {{ tahun }}.
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      {% if groups %}
+      <tfoot>
+        <tr>
+          <td colspan="3">TOTAL ({{ groups|length }} sheet petugas)</td>
+          <td class="num">{{ tot.jumlah_wp|angka }}</td>
+          <td class="num">{{ tot.pokok_rp|rp }}</td>
+          <td class="num" style="color:var(--bad)">{{ tot.denda_rp|rp }}</td>
+          {% if termasuk_proses %}<td class="num">{{ tot.dibayar_rp|rp }}</td>{% endif %}
+          <td class="num" style="color:var(--warn);font-weight:700">{{ tot.kurang_rp|rp }}</td>
+          <td class="tanpa-cetak"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% if groups %}
+<div class="grid" style="gap:.75rem">
+  {% for g in groups %}
+  <details class="card pad0" id="{{ 'petugas-' ~ g.petugas_id if g.petugas_id else 'petugas-tanpa' }}" {{ 'open' if loop.first and g.jumlah_wp <= 25 }}>
+    <summary class="head" style="cursor:pointer;list-style:none">
+      <div>
+        <b>Sheet: {{ g.sheet_nama }}</b>
+        <span class="help" style="margin-left:.4rem">Petugas: {{ g.nama }}{% if g.blok and g.blok != '-' %} ({{ g.blok }}){% endif %}</span>
+      </div>
+      <div class="row" style="flex:0 1 auto;gap:.5rem;align-items:center">
+        <span class="badge warn">{{ g.jumlah_wp|angka }} WP</span>
+        <b>{{ g.kurang_rp|rp }}</b>
+      </div>
+    </summary>
+    <div class="tabel-scroll" style="max-height:380px">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:4%">No</th>
+            <th>NOP</th>
+            <th>Nama Wajib Pajak</th>
+            <th class="kolom-hapus">Alamat Objek Pajak</th>
+            <th class="num">Pokok</th>
+            <th class="num">Denda</th>
+            <th class="num">Total Tagihan</th>
+            {% if termasuk_proses %}<th>Status</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in g.rows %}
+          <tr>
+            <td class="num">{{ loop.index }}</td>
+            <td class="nop"><a href="{{ url_for('app.tagihan_detail', tag_id=r.id) }}">{{ r.nop }}</a></td>
+            <td><b>{{ r.nama_wp }}</b>{% if r.alamat_wp %}<br><span class="help">{{ r.alamat_wp }}</span>{% endif %}</td>
+            <td class="kolom-hapus help">{{ r.alamat_objek }}</td>
+            <td class="num">{{ r.pokok|rp }}</td>
+            <td class="num" style="color:var(--bad)">{{ r.denda|rp }}</td>
+            <td class="num"><b>{{ r.kurang|rp }}</b></td>
+            {% if termasuk_proses %}
+            <td>
+              {% if r.status == 'proses' %}<span class="badge warn">Diproses</span>
+              {% else %}<span class="badge muted">Belum bayar</span>{% endif %}
+            </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
